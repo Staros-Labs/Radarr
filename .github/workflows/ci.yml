@@ -372,7 +372,7 @@ jobs:
       RADARR_VERSION: ${{ needs.setup.outputs.radarr_version }}
       BUILDNAME: ${{ needs.setup.outputs.branch_name }}.${{ needs.setup.outputs.radarr_version }}
       REGISTRY: ghcr.io
-      IMAGE_NAME: starosdev/radarr
+      IMAGE_NAME: staros-labs/radarr
     strategy:
       fail-fast: false
       matrix:
@@ -440,7 +440,7 @@ jobs:
     env:
       RADARR_VERSION: ${{ needs.setup.outputs.radarr_version }}
       REGISTRY: ghcr.io
-      IMAGE_NAME: starosdev/radarr
+      IMAGE_NAME: staros-labs/radarr
     steps:
       - name: Login to GHCR
         uses: docker/login-action@v3
