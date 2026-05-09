@@ -178,3 +178,4 @@ node_modules.nosync
 # Claude Code
 .claude/
 CLAUDE.md
+AGENTS.md
