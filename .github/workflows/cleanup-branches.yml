@@ -36,7 +36,7 @@ jobs:
           echo "=================================================="
           echo ""
 
-          PROTECTED_BRANCHES="master develop main"
+          PROTECTED_BRANCHES="master develop"
           DELETED_COUNT=0
           KEPT_COUNT=0
 
