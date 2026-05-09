@@ -4,7 +4,6 @@
 [allowlist]
 description = "Global allowlist"
 paths = [
-    '''\.github/workflows/''',
     '''node_modules/''',
     '''_output/''',
     '''_tests/''',

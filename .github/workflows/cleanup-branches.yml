@@ -56,8 +56,8 @@ jobs:
               continue
             fi
 
-            merged_to_develop=$(git branch -r --merged origin/develop | grep -c "origin/$branch" || echo "0")
-            merged_to_master=$(git branch -r --merged origin/master | grep -c "origin/$branch" || echo "0")
+            merged_to_develop=$(git branch -r --merged origin/develop | grep -cxF "  origin/$branch" || echo "0")
+            merged_to_master=$(git branch -r --merged origin/master | grep -cxF "  origin/$branch" || echo "0")
 
             # Check GitHub API for squash-merged PRs
             if [ "$merged_to_develop" = "0" ] && [ "$merged_to_master" = "0" ]; then
