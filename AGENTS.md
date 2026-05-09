@@ -1,53 +1,37 @@
-# AGENTS.md
+# Radarr Fork Agent Instructions
 
-This file defines how builders and reviewers should work in this repository.
+These instructions apply to automated builders and reviewers working in this repository.
 
-## Session Start
+## Session Startup
 
-- Read this file at the start of every session before planning, editing, or running broad repo commands.
-- Work in a git worktree for every editing session. Do not make code or documentation changes directly in the main repository directory unless explicitly authorized.
-- Keep replies short, factual, and focused on the current task.
-- Do not use emojis in commits, pull requests, comments, or documentation.
-- Do not mention AI assistant product names in commits, pull requests, issues, or repository files. Use role-based terms such as builder or reviewer.
+- Work from a git worktree, not directly in the main checkout.
+- Read this file at the start of each session before making changes.
+- Check `git status --short --branch` before editing.
+- Assume the worktree may contain user changes. Do not revert or clean them up unless the user explicitly asks.
 
-## Collaboration Style
+## Communication
 
-- Act like an involved engineering collaborator, not a passive approver.
-- Push back when a request is risky, underspecified, or conflicts with the repo's documented workflow.
-- Once the scope is clear, execute directly and carry the work through verification.
-- Preserve unrelated local changes. Never revert work you did not make unless explicitly instructed.
+- Keep updates concise and factual.
+- Act like an involved collaborator, not a passive executor.
+- Push back when a request is risky, underspecified, or likely to create avoidable maintenance problems.
+- Use role-based language such as `builder` or `reviewer` if you need to describe automation.
+- Do not use emojis in commits, pull requests, issues, comments, or docs.
 
-## Branching And Delivery
+## Branch Workflow
 
-- Follow the repository's documented branch model from `CONTRIBUTING.md`.
-- Start feature and fix work from `develop` unless the task is an urgent production hotfix that clearly belongs on `master`.
-- Use focused topic branches for edits instead of committing directly on long-lived branches.
-- Rebase onto the current remote branch before pushing when the local branch is behind.
-- Open pull requests against `develop` for normal work and against `master` only for hotfixes.
+- This fork uses `develop` as the integration branch and `master` as the production branch.
+- Keep upstream-sync or vendor-tracking work separate from Staros-specific release work.
+- Do not assume upstream defaults are the same as this fork's release process.
 
-## Repo Shape
+## Editing Standards
 
-- Backend code lives under `src/` and is built from `src/Radarr.sln`.
-- Frontend code lives under `frontend/`.
-- Build artifacts and test outputs are expected under `_output/` and `_tests/`.
-- The codebase still uses the legacy `NzbDrone.*` directory and namespace layout in many backend areas.
+- Match the existing .NET, frontend, and GitHub Actions patterns already in the repo.
+- Keep changes narrow and avoid unrelated cleanup in the same commit.
+- Use `rg` for search and `apply_patch` for manual edits.
+- Update docs or workflow guidance when branch behavior, release flow, or automation expectations change.
 
-## Build And Test Commands
+## Validation
 
-- Backend build: `dotnet build src/Radarr.sln`
-- Backend test entrypoint: `./test.sh Linux Unit Test`
-- Frontend install: `yarn install --frozen-lockfile`
-- Frontend build: `yarn build`
-- Frontend lint: `yarn lint --fix`
-
-## Editing Rules
-
-- Follow existing code style and project conventions instead of introducing new patterns.
-- Keep changes scoped to the task. Avoid opportunistic refactors unless they are necessary to complete the requested work safely.
-- Add or update tests when changing behavior.
-- Prefer small, reviewable commits with clear intent.
-
-## Verification
-
-- Report what you changed, how you verified it, and any gaps that remain.
-- If you could not run a relevant build or test step, say that explicitly.
+- Run the smallest useful check for the files you changed.
+- For workflow-only changes, use focused review plus `git diff --check`.
+- If you cannot run a validation step, state that clearly and call out the remaining risk.
