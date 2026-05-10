@@ -28,7 +28,6 @@ env:
   MAJOR_VERSION: '6.1.1'
   DOTNET_VERSION: '8.0.405'
   NODE_VERSION: '20.19.0'
-  INNO_VERSION: '6.4.2'
 
 jobs:
   # ---------------------------------------------------------------------------
@@ -281,6 +280,192 @@ jobs:
         with:
           name: packages
           path: _archives/
+
+  # ---------------------------------------------------------------------------
+  # Release: create GitHub Release with package assets
+  # ---------------------------------------------------------------------------
+  release:
+    runs-on: ubuntu-24.04
+    needs: [packages, installer, setup]
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/master')
+    permissions:
+      contents: write
+    env:
+      RADARR_VERSION: ${{ needs.setup.outputs.radarr_version }}
+      BRANCH_NAME: ${{ needs.setup.outputs.branch_name }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download packages
+        uses: actions/download-artifact@v4
+        with:
+          name: packages
+          path: _release/
+
+      - name: Download installer
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-installer
+          path: _release/
+
+      - name: Generate checksums
+        working-directory: _release
+        run: |
+          sha256sum * > sha256sums.txt
+          cat sha256sums.txt
+
+      - name: Determine release type
+        id: release-type
+        run: |
+          if [ "${{ github.ref }}" = "refs/heads/master" ]; then
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+            echo "tag=v${RADARR_VERSION}" >> "$GITHUB_OUTPUT"
+          else
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+            echo "tag=v${RADARR_VERSION}-nightly" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create git tag
+        env:
+          TAG: ${{ steps.release-type.outputs.tag }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -d "${TAG}" 2>/dev/null || true
+          git push origin ":refs/tags/${TAG}" 2>/dev/null || true
+          git tag -a "${TAG}" -m "Release ${TAG}"
+          git push origin "${TAG}"
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.release-type.outputs.tag }}
+          PRERELEASE: ${{ steps.release-type.outputs.prerelease }}
+        run: |
+          RELEASE_ARGS=(
+            "${TAG}"
+            --repo Starosdev/Radarr
+            --title "Radarr v${RADARR_VERSION}"
+            --generate-notes
+          )
+
+          if [ "${PRERELEASE}" = "true" ]; then
+            RELEASE_ARGS+=(--prerelease)
+          else
+            RELEASE_ARGS+=(--latest)
+          fi
+
+          gh release create "${RELEASE_ARGS[@]}" _release/*
+
+  # ---------------------------------------------------------------------------
+  # Docker: build and push per-arch images to GHCR
+  # ---------------------------------------------------------------------------
+  docker:
+    runs-on: ubuntu-24.04
+    needs: [packages, setup]
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/master')
+    permissions:
+      contents: read
+      packages: write
+    env:
+      RADARR_VERSION: ${{ needs.setup.outputs.radarr_version }}
+      BUILDNAME: ${{ needs.setup.outputs.branch_name }}.${{ needs.setup.outputs.radarr_version }}
+      REGISTRY: ghcr.io
+      IMAGE_NAME: staros-labs/radarr
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/amd64
+            archive_rid: linux-core-x64
+          - platform: linux/arm64
+            archive_rid: linux-core-arm64
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Download packages
+        uses: actions/download-artifact@v4
+        with:
+          name: packages
+          path: _archives/
+
+      - name: Extract package for platform
+        run: |
+          mkdir -p radarr
+          tar xzf _archives/Radarr.${BUILDNAME}.${{ matrix.archive_rid }}.tar.gz -C radarr/
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: ${{ matrix.platform }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: ${{ matrix.platform }}
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.RADARR_VERSION }}-${{ matrix.archive_rid }}
+          labels: |
+            org.opencontainers.image.title=Radarr
+            org.opencontainers.image.version=${{ env.RADARR_VERSION }}
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+          cache-from: type=gha,scope=${{ matrix.archive_rid }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.archive_rid }}
+
+  # ---------------------------------------------------------------------------
+  # Docker Manifest: combine per-arch images into multi-arch manifest
+  # ---------------------------------------------------------------------------
+  docker-manifest:
+    runs-on: ubuntu-24.04
+    needs: [docker, setup]
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/master')
+    permissions:
+      packages: write
+    env:
+      RADARR_VERSION: ${{ needs.setup.outputs.radarr_version }}
+      REGISTRY: ghcr.io
+      IMAGE_NAME: staros-labs/radarr
+    steps:
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Create and push manifests
+        run: |
+          VERSION_TAG="${REGISTRY}/${IMAGE_NAME}:${RADARR_VERSION}"
+          BRANCH_TAG="${REGISTRY}/${IMAGE_NAME}:${{ github.ref == 'refs/heads/master' && 'latest' || 'develop' }}"
+
+          docker buildx imagetools create -t "${VERSION_TAG}" \
+            "${REGISTRY}/${IMAGE_NAME}:${RADARR_VERSION}-linux-core-x64" \
+            "${REGISTRY}/${IMAGE_NAME}:${RADARR_VERSION}-linux-core-arm64"
+
+          docker buildx imagetools create -t "${BRANCH_TAG}" \
+            "${REGISTRY}/${IMAGE_NAME}:${RADARR_VERSION}-linux-core-x64" \
+            "${REGISTRY}/${IMAGE_NAME}:${RADARR_VERSION}-linux-core-arm64"
 
   # ---------------------------------------------------------------------------
   # Lint
@@ -694,7 +879,6 @@ jobs:
     env:
       RADARRVERSION: ${{ needs.setup.outputs.radarr_version }}
       MAJORVERSION: '6.1.1'
-      INNOVERSION: '6.4.2'
       BUILD_SOURCEBRANCHNAME: ${{ needs.setup.outputs.branch_name }}
       BUILDNAME: ${{ needs.setup.outputs.branch_name }}.${{ needs.setup.outputs.radarr_version }}
     steps:
@@ -947,6 +1131,8 @@ jobs:
       - integration-docker
       - integration-postgres
       - installer
+      - release
+      - docker-manifest
       - sentry
       - sonarqube-frontend
       - sonarqube-backend
@@ -972,6 +1158,18 @@ jobs:
 
           RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
 
+          RELEASE_URL="${{ github.server_url }}/${{ github.repository }}/releases/tag/v${RADARR_VERSION}${{ github.ref == 'refs/heads/develop' && '-nightly' || '' }}"
+
+          RELEASE_FIELD=""
+          if [ "${{ needs.release.result }}" = "success" ]; then
+            RELEASE_FIELD=",{\"name\": \"Release\", \"value\": \"[v${RADARR_VERSION}](${RELEASE_URL})\", \"inline\": true}"
+          fi
+
+          DOCKER_FIELD=""
+          if [ "${{ needs.docker-manifest.result }}" = "success" ]; then
+            DOCKER_FIELD=",{\"name\": \"Docker\", \"value\": \"ghcr.io/starosdev/radarr:${RADARR_VERSION}\", \"inline\": true}"
+          fi
+
           # Only send if webhook is configured
           if [ -n "$DISCORD_WEBHOOK_KEY" ] && [ -n "$DISCORD_WEBHOOK_ID" ]; then
             curl -s -H "Content-Type: application/json" \
@@ -984,7 +1182,7 @@ jobs:
                   \"color\": ${COLOR},
                   \"fields\": [
                     {\"name\": \"Branch\", \"value\": \"${BRANCH_NAME}\", \"inline\": true},
-                    {\"name\": \"Version\", \"value\": \"${RADARR_VERSION}\", \"inline\": true}
+                    {\"name\": \"Version\", \"value\": \"${RADARR_VERSION}\", \"inline\": true}${RELEASE_FIELD}${DOCKER_FIELD}
                   ]
                 }]
               }" \

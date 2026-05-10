@@ -16,6 +16,7 @@ These instructions apply to automated builders and reviewers working in this rep
 - Push back when a request is risky, underspecified, or likely to create avoidable maintenance problems.
 - Use role-based language such as `builder` or `reviewer` if you need to describe automation.
 - Do not use emojis in commits, pull requests, issues, comments, or docs.
+- Do not mention assistant product names in commits, pull requests, comments, or repo files.
 
 ## Branch Workflow
 

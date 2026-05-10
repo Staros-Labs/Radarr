@@ -1,0 +1,11 @@
+[global]
+# Radarr-specific gitleaks config
+
+[allowlist]
+description = "Global allowlist"
+paths = [
+    '''node_modules/''',
+    '''_output/''',
+    '''_tests/''',
+    '''_artifacts/''',
+]
