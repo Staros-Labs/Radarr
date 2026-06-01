@@ -177,6 +177,7 @@ node_modules.nosync
 
 # Claude Code
 .claude/
+.codex/skills/
 CLAUDE.md
 AGENTS.md
 docs/plans/
