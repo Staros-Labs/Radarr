@@ -36,3 +36,6 @@ These instructions apply to automated builders and reviewers working in this rep
 - Run the smallest useful check for the files you changed.
 - For workflow-only changes, use focused review plus `git diff --check`.
 - If you cannot run a validation step, state that clearly and call out the remaining risk.
+## Git worktrees
+
+Worktree directory preference: create git worktrees under `~/worktrees/<repo>/<branch>`, never inside this clone or `~/Documents/Repos.nosync/`. Merged/clean worktrees are auto-pruned weekly by `infra/scripts/prune-worktrees.sh` (launchd `dev.staros.worktree-janitor`).
