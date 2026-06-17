@@ -279,6 +279,13 @@ namespace NzbDrone.Core.Test.ParserTests
             Parser.Parser.ParseMovieTitle(postTitle).HardcodedSubs.Should().Be(sub);
         }
 
+        [TestCase("The.Movie.from.U.N.C.L.E.2015.1080p.BluRay.x264-SPARKS", "SPARKS")]
+        [TestCase("R.I.P.D.2013.720p.BluRay.x264-SPARKS", "SPARKS")]
+        public void should_parse_release_group_for_titles_with_periods(string postTitle, string releaseGroup)
+        {
+            Parser.Parser.ParseMovieTitle(postTitle).ReleaseGroup.Should().Be(releaseGroup);
+        }
+
         [TestCase("That Italian Movie 2008 [tt1234567] 720p BluRay X264", "tt1234567")]
         [TestCase("That Italian Movie 2008 [tt12345678] 720p BluRay X264", "tt12345678")]
         public void should_parse_imdb_in_title(string postTitle, string imdb)
