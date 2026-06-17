@@ -1057,13 +1057,15 @@ jobs:
         shell: pwsh
 
       - name: Generate coverage report
-        uses: danielpalme/ReportGenerator-GitHub-Action@5
         if: always()
-        with:
-          reports: CoverageResults/**/coverage.cobertura.xml
-          targetdir: CoverageResults/combined
-          reporttypes: HtmlInline;Cobertura;Badges
-          sourcedirs: src
+        run: |
+          dotnet tool install --tool-path ./.tools dotnet-reportgenerator-globaltool --version 5.*
+          ./.tools/reportgenerator `
+            "-reports:CoverageResults/**/coverage.cobertura.xml" `
+            "-targetdir:CoverageResults/combined" `
+            "-reporttypes:HtmlInline;Cobertura;Badges" `
+            "-sourcedirs:src"
+        shell: pwsh
 
   # ---------------------------------------------------------------------------
   # API Docs: generate OpenAPI spec, create PR
