@@ -2,8 +2,4 @@
   background-color: var(--movieBackgroundColor);
   text-align: center;
   font-size: $smallFontSize;
-  padding: 4px;
-  line-height: 1.2;
-  max-height: 2.4em; /* 2 lines max */
-  overflow: hidden;
 }

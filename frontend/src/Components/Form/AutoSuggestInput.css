@@ -24,7 +24,7 @@
   z-index: $popperZIndex;
 
   .suggestionsContainer {
-    overflow-y: hidden;
+    overflow-y: auto;
     max-height: 200px;
     width: 100%;
     border: 1px solid var(--inputBorderColor);
