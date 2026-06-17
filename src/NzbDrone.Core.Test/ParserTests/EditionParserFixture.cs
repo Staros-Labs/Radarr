@@ -24,6 +24,7 @@ namespace NzbDrone.Core.Test.ParserTests
         [TestCase("Movie 2012 IMAX.mkv", "IMAX")]
         [TestCase("Movie 2012 Restored.mkv", "Restored")]
         [TestCase("Movie Title.Special.Edition.Fan Edit.2012..BRRip.x264.AAC-m2g", "Special Edition Fan Edit")]
+        [TestCase("Mission.Impossible.3.2011.Special.Edition.1080p.BluRay.x264-SPARKS", "Special Edition")]
         [TestCase("Movie Title (Despecialized) 1999.mkv", "Despecialized")]
         [TestCase("Movie Title.(Special.Edition.Remastered).2012.[Bluray-1080p].mkv", "Special Edition Remastered")]
         [TestCase("Movie Title Extended 2012", "Extended")]
