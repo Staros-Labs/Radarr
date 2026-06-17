@@ -36,9 +36,9 @@ jobs:
   setup:
     runs-on: ubuntu-24.04
     outputs:
-      build_number: ${{ steps.counter.outputs.build_number }}
-      radarr_version: ${{ steps.counter.outputs.radarr_version }}
-      branch_name: ${{ steps.counter.outputs.branch_name }}
+      build_number: ${{ steps.build-meta.outputs.build_number }}
+      radarr_version: ${{ steps.build-meta.outputs.radarr_version }}
+      branch_name: ${{ steps.build-meta.outputs.branch_name }}
       backend_changed: ${{ steps.changes.outputs.backend_changed }}
     steps:
       - name: Checkout
@@ -46,49 +46,61 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Generate build number
-        id: counter
+      - name: Generate build metadata
+        id: build-meta
         env:
           MAJOR_VERSION: ${{ env.MAJOR_VERSION }}
           HEAD_REF: ${{ github.head_ref }}
           REF_NAME: ${{ github.ref_name }}
           EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
         run: |
           git fetch --tags --force
-          LAST=$(git tag -l 'build-counter-*' | sed 's/build-counter-//' | sort -n | tail -1)
-          NEXT=$(( ${LAST:-2999} + 1 ))
-          echo "build_number=$NEXT" >> "$GITHUB_OUTPUT"
-          echo "radarr_version=${MAJOR_VERSION}.${NEXT}" >> "$GITHUB_OUTPUT"
 
-          if [ "$EVENT_NAME" = "pull_request" ]; then
-            echo "branch_name=$HEAD_REF" >> "$GITHUB_OUTPUT"
-          else
-            echo "branch_name=$REF_NAME" >> "$GITHUB_OUTPUT"
+          LAST=$(git tag -l 'build-counter-*' | sed 's/build-counter-//' | sort -n | tail -1)
+          BUILD_NUMBER=$(( ${LAST:-2999} + 1 ))
+
+          if [ "$EVENT_NAME" != "pull_request" ]; then
+            tag_pushed=false
+            for attempt in 1 2 3; do
+              if git tag "build-counter-${BUILD_NUMBER}" && git push origin "build-counter-${BUILD_NUMBER}"; then
+                echo "Tag pushed successfully on attempt $attempt"
+                tag_pushed=true
+                break
+              fi
+              echo "Tag push failed on attempt $attempt, retrying..."
+              git tag -d "build-counter-${BUILD_NUMBER}" 2>/dev/null || true
+              git fetch --tags --force
+              LAST=$(git tag -l 'build-counter-*' | sed 's/build-counter-//' | sort -n | tail -1)
+              BUILD_NUMBER=$(( LAST + 1 ))
+            done
+
+            if [ "$tag_pushed" != "true" ]; then
+              echo "::error::Failed to reserve a build counter tag after 3 attempts"
+              exit 1
+            fi
           fi
 
-      - name: Push build counter tag
-        if: github.event_name != 'pull_request'
-        env:
-          BUILD_NUMBER: ${{ steps.counter.outputs.build_number }}
-        run: |
-          for attempt in 1 2 3; do
-            if git tag "build-counter-${BUILD_NUMBER}" && git push origin "build-counter-${BUILD_NUMBER}"; then
-              echo "Tag pushed successfully on attempt $attempt"
-              break
-            fi
-            echo "Tag push failed on attempt $attempt, retrying..."
-            git fetch --tags --force
-            LAST=$(git tag -l 'build-counter-*' | sed 's/build-counter-//' | sort -n | tail -1)
-            BUILD_NUMBER=$(( LAST + 1 ))
-            echo "build_number=$BUILD_NUMBER" >> "$GITHUB_OUTPUT"
-            echo "radarr_version=${MAJOR_VERSION}.${BUILD_NUMBER}" >> "$GITHUB_OUTPUT"
-          done
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            BRANCH_NAME="$HEAD_REF"
+          else
+            BRANCH_NAME="$REF_NAME"
+          fi
+
+          {
+            echo "build_number=$BUILD_NUMBER"
+            echo "radarr_version=${MAJOR_VERSION}.${BUILD_NUMBER}"
+            echo "branch_name=$BRANCH_NAME"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Detect backend changes
         id: changes
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
         run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            git diff origin/develop...HEAD --name-only | grep -qE "^(src/|azure-pipelines.yml)" \
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            git diff "origin/${BASE_REF}...HEAD" --name-only | grep -qE "^(src/|distribution/|build\.sh$|test\.sh$|docs\.sh$|Dockerfile$|global\.json$|azure-pipelines\.yml$|\.github/workflows/ci\.yml$)" \
               && echo "backend_changed=true" >> "$GITHUB_OUTPUT" \
               || echo "backend_changed=false" >> "$GITHUB_OUTPUT"
           else
@@ -96,11 +108,14 @@ jobs:
           fi
 
   # ---------------------------------------------------------------------------
-  # Build Backend: cross-compile all RIDs from a single Linux runner
+  # Build Backend: cross-compile all RIDs from a single Windows runner
   # ---------------------------------------------------------------------------
   build-backend:
-    runs-on: ubuntu-24.04
+    runs-on: windows-2025
     needs: setup
+    defaults:
+      run:
+        shell: bash
     env:
       RADARRVERSION: ${{ needs.setup.outputs.radarr_version }}
       BUILD_SOURCEBRANCHNAME: ${{ needs.setup.outputs.branch_name }}
@@ -123,18 +138,8 @@ jobs:
           key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj') }}
           restore-keys: nuget-${{ runner.os }}-
 
-      - name: Enable FreeBSD platform in SDK
-        run: |
-          BUNDLED="${DOTNET_ROOT}/sdk/${DOTNET_VERSION}/Microsoft.NETCoreSdk.BundledVersions.props"
-          echo "Patching: $BUNDLED"
-          if grep -q freebsd-x64 "$BUNDLED"; then
-            echo "Extra platforms already enabled"
-          else
-            sed -i.ORI 's/osx-x64/osx-x64;freebsd-x64/' "$BUNDLED"
-          fi
-
       - name: Build backend
-        run: ./build.sh --backend --enable-extra-platforms
+        run: ./build.sh --enable-extra-platforms-in-sdk --backend --enable-extra-platforms
 
       - name: Clean intermediate output
         run: |
@@ -253,27 +258,39 @@ jobs:
           mkdir -p _archives
 
           # Windows zips
-          cd _artifacts/win-x64/net8.0 && zip -r ../../../_archives/Radarr.${BUILDNAME}.windows-core-x64.zip . && cd ../../..
-          cd _artifacts/win-x86/net8.0 && zip -r ../../../_archives/Radarr.${BUILDNAME}.windows-core-x86.zip . && cd ../../..
+          (
+            cd "_artifacts/win-x64/net8.0"
+            zip -r "../../../_archives/Radarr.${BUILDNAME}.windows-core-x64.zip" .
+          )
+          (
+            cd "_artifacts/win-x86/net8.0"
+            zip -r "../../../_archives/Radarr.${BUILDNAME}.windows-core-x86.zip" .
+          )
 
           # macOS app zips
-          cd _artifacts/osx-x64-app/net8.0 && zip -r ../../../_archives/Radarr.${BUILDNAME}.osx-app-core-x64.zip . && cd ../../..
-          cd _artifacts/osx-arm64-app/net8.0 && zip -r ../../../_archives/Radarr.${BUILDNAME}.osx-app-core-arm64.zip . && cd ../../..
+          (
+            cd "_artifacts/osx-x64-app/net8.0"
+            zip -r "../../../_archives/Radarr.${BUILDNAME}.osx-app-core-x64.zip" .
+          )
+          (
+            cd "_artifacts/osx-arm64-app/net8.0"
+            zip -r "../../../_archives/Radarr.${BUILDNAME}.osx-app-core-arm64.zip" .
+          )
 
           # macOS tars
-          tar -czf _archives/Radarr.${BUILDNAME}.osx-core-x64.tar.gz -C _artifacts/osx-x64/net8.0 .
-          tar -czf _archives/Radarr.${BUILDNAME}.osx-core-arm64.tar.gz -C _artifacts/osx-arm64/net8.0 .
+          tar -czf "_archives/Radarr.${BUILDNAME}.osx-core-x64.tar.gz" -C "_artifacts/osx-x64/net8.0" .
+          tar -czf "_archives/Radarr.${BUILDNAME}.osx-core-arm64.tar.gz" -C "_artifacts/osx-arm64/net8.0" .
 
           # Linux tars
-          tar -czf _archives/Radarr.${BUILDNAME}.linux-core-x64.tar.gz -C _artifacts/linux-x64/net8.0 .
-          tar -czf _archives/Radarr.${BUILDNAME}.linux-musl-core-x64.tar.gz -C _artifacts/linux-musl-x64/net8.0 .
-          tar -czf _archives/Radarr.${BUILDNAME}.linux-core-arm.tar.gz -C _artifacts/linux-arm/net8.0 .
-          tar -czf _archives/Radarr.${BUILDNAME}.linux-musl-core-arm.tar.gz -C _artifacts/linux-musl-arm/net8.0 .
-          tar -czf _archives/Radarr.${BUILDNAME}.linux-core-arm64.tar.gz -C _artifacts/linux-arm64/net8.0 .
-          tar -czf _archives/Radarr.${BUILDNAME}.linux-musl-core-arm64.tar.gz -C _artifacts/linux-musl-arm64/net8.0 .
+          tar -czf "_archives/Radarr.${BUILDNAME}.linux-core-x64.tar.gz" -C "_artifacts/linux-x64/net8.0" .
+          tar -czf "_archives/Radarr.${BUILDNAME}.linux-musl-core-x64.tar.gz" -C "_artifacts/linux-musl-x64/net8.0" .
+          tar -czf "_archives/Radarr.${BUILDNAME}.linux-core-arm.tar.gz" -C "_artifacts/linux-arm/net8.0" .
+          tar -czf "_archives/Radarr.${BUILDNAME}.linux-musl-core-arm.tar.gz" -C "_artifacts/linux-musl-arm/net8.0" .
+          tar -czf "_archives/Radarr.${BUILDNAME}.linux-core-arm64.tar.gz" -C "_artifacts/linux-arm64/net8.0" .
+          tar -czf "_archives/Radarr.${BUILDNAME}.linux-musl-core-arm64.tar.gz" -C "_artifacts/linux-musl-arm64/net8.0" .
 
           # FreeBSD tar
-          tar -czf _archives/Radarr.${BUILDNAME}.freebsd-core-x64.tar.gz -C _artifacts/freebsd-x64/net8.0 .
+          tar -czf "_archives/Radarr.${BUILDNAME}.freebsd-core-x64.tar.gz" -C "_artifacts/freebsd-x64/net8.0" .
 
       - name: Upload packages
         uses: actions/upload-artifact@v4
@@ -314,7 +331,7 @@ jobs:
       - name: Generate checksums
         working-directory: _release
         run: |
-          sha256sum * > sha256sums.txt
+          sha256sum -- ./* > sha256sums.txt
           cat sha256sums.txt
 
       - name: Determine release type
@@ -347,7 +364,7 @@ jobs:
         run: |
           RELEASE_ARGS=(
             "${TAG}"
-            --repo Starosdev/Radarr
+            --repo "${{ github.repository }}"
             --title "Radarr v${RADARR_VERSION}"
             --generate-notes
           )
@@ -398,7 +415,7 @@ jobs:
       - name: Extract package for platform
         run: |
           mkdir -p radarr
-          tar xzf _archives/Radarr.${BUILDNAME}.${{ matrix.archive_rid }}.tar.gz -C radarr/
+          tar xzf "_archives/Radarr.${BUILDNAME}.${{ matrix.archive_rid }}.tar.gz" -C radarr/
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -1102,7 +1119,7 @@ jobs:
           else
             git commit -m "Automated API Docs update"
             git push -f --set-upstream origin api-docs
-            gh pr create --repo Starosdev/Radarr --title "Update API docs" --base develop --head api-docs --body "Automated API documentation update." || echo "PR already exists"
+            gh pr create --repo "${{ github.repository }}" --title "Update API docs" --base develop --head api-docs --body "Automated API documentation update." || echo "PR already exists"
           fi
         shell: bash
 
