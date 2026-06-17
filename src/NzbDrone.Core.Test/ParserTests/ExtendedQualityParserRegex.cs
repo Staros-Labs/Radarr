@@ -22,11 +22,13 @@ namespace NzbDrone.Core.Test.ParserTests
         [TestCase("Movie.Title.Super.Duper.Real.Proper.HDTV.x264-FTP", 0)]
         [TestCase("Movie.Title.PROPER.HDTV.x264-RiVER-RP", 0)]
         [TestCase("Movie.Title.PROPER.REAL.RERIP.1080p.BluRay.x264-TENEIGHTY", 1)]
+        [TestCase("Movie.Title.2013.REAL.PROPER.1080p.BluRay.x264-GRP", 1)]
         [TestCase("[MGS] - Movie.Title - Episode 02v2 - [D8B6C90D]", 0)]
         [TestCase("[Hatsuyuki] Movie Title - 07 [v2][848x480][23D8F455].avi", 0)]
         [TestCase("[DeadFish] Movie Title - 01v3 [720p][AAC]", 0)]
         [TestCase("[DeadFish] Movie Title Sword - 01v4 [720p][AAC]", 0)]
         [TestCase("The Real Movie.Titlewives of Some Place - S01E01 - Why are we doing this?", 0)]
+        [TestCase("The.Real.Movie.2013.1080p.BluRay.x264-GRP", 0)]
         public void should_parse_reality_from_title(string title, int reality)
         {
             QualityParser.ParseQuality(title).Revision.Real.Should().Be(reality);
