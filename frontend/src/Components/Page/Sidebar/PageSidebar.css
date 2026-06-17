@@ -1,6 +1,7 @@
 .sidebarContainer {
   flex: 0 0 $sidebarWidth;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
   width: $sidebarWidth;
   background-color: var(--sidebarBackgroundColor);
   transition: transform 300ms ease-in-out;
@@ -10,7 +11,8 @@
 .sidebar {
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
   background-color: var(--sidebarBackgroundColor);
   color: var(--white);
 }
@@ -21,6 +23,8 @@
     top: 0;
     z-index: 2;
     height: 100vh;
+    overflow-y: auto;
+    overflow-x: hidden;
   }
 
   .sidebar {
@@ -29,5 +33,6 @@
     overflow-y: auto;
     width: 100%;
     height: 100%;
+    overflow-x: hidden;
   }
 }
