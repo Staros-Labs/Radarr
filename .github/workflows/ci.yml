@@ -43,7 +43,7 @@ jobs:
       backend_changed: ${{ steps.changes.outputs.backend_changed }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -101,7 +101,7 @@ jobs:
       BUILD_SOURCEBRANCHNAME: ${{ needs.setup.outputs.branch_name }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           submodules: true
           fetch-depth: 1
@@ -112,7 +112,7 @@ jobs:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
       - name: Cache NuGet packages
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.nuget/packages
           key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj') }}
@@ -129,32 +129,32 @@ jobs:
           find _tests -depth -empty -type d -exec rm -r "{}" \;
 
       - name: Upload backend output
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: backend-output
           path: _output/
           compression-level: 1
 
       - name: Upload win-x64 tests
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: win-x64-tests
           path: _tests/net8.0/win-x64/publish/
 
       - name: Upload linux-x64 tests
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: linux-x64-tests
           path: _tests/net8.0/linux-x64/publish/
 
       - name: Upload linux-musl-x64 tests
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: linux-musl-x64-tests
           path: _tests/net8.0/linux-musl-x64/publish/
 
       - name: Upload osx-x64 tests
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: osx-x64-tests
           path: _tests/net8.0/osx-x64/publish/
@@ -167,18 +167,18 @@ jobs:
     needs: setup
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           submodules: true
           fetch-depth: 1
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: ${{ env.NODE_VERSION }}
 
       - name: Cache Yarn packages
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.cache/yarn
           key: yarn-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
@@ -191,7 +191,7 @@ jobs:
           YARN_CACHE_FOLDER: ~/.cache/yarn
 
       - name: Upload frontend output
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: frontend-output
           path: _output/UI/
@@ -208,18 +208,18 @@ jobs:
       BUILDNAME: ${{ needs.setup.outputs.branch_name_safe }}.${{ needs.setup.outputs.radarr_version }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 1
 
       - name: Download backend output
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: backend-output
           path: _output/
 
       - name: Download frontend output
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: frontend-output
           path: _output/UI/
@@ -273,7 +273,7 @@ jobs:
           tar -czf "_archives/Radarr.${BUILDNAME}.freebsd-core-x64.tar.gz" -C "_artifacts/freebsd-x64/net8.0" .
 
       - name: Upload packages
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: packages
           path: _archives/
@@ -292,18 +292,18 @@ jobs:
       BRANCH_NAME: ${{ needs.setup.outputs.branch_name }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
       - name: Download packages
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: packages
           path: _release/
 
       - name: Download installer
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: windows-installer
           path: _release/
@@ -382,12 +382,12 @@ jobs:
             archive_rid: linux-core-arm64
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 1
 
       - name: Download packages
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: packages
           path: _archives/
@@ -472,18 +472,18 @@ jobs:
     needs: setup
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           submodules: true
           fetch-depth: 1
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: ${{ env.NODE_VERSION }}
 
       - name: Cache Yarn packages
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.cache/yarn
           key: yarn-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
@@ -525,7 +525,7 @@ jobs:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
       - name: Download test artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: ${{ matrix.artifact }}
           path: _tests/
@@ -550,7 +550,7 @@ jobs:
         shell: bash
 
       - name: Upload test results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: ${{ matrix.test-name }}-unit-test-results
@@ -568,7 +568,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Download test artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: linux-musl-x64-tests
           path: _tests/
@@ -602,7 +602,7 @@ jobs:
             '
 
       - name: Upload test results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: musl-unit-test-results
@@ -645,7 +645,7 @@ jobs:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
       - name: Download test artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: linux-x64-tests
           path: _tests/
@@ -661,7 +661,7 @@ jobs:
           _tests/test.sh Linux Unit Test
 
       - name: Upload test results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: postgres${{ matrix.postgres-version }}-unit-test-results
@@ -703,13 +703,13 @@ jobs:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
       - name: Download test artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: ${{ matrix.artifact }}
           path: _tests/
 
       - name: Download packages
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: packages
           path: _packages/
@@ -748,7 +748,7 @@ jobs:
         shell: bash
 
       - name: Upload test results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: ${{ matrix.test-name }}-integration-test-results
@@ -766,13 +766,13 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Download test artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: linux-musl-x64-tests
           path: _tests/
 
       - name: Download packages
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: packages
           path: _packages/
@@ -814,7 +814,7 @@ jobs:
             '
 
       - name: Upload test results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: musl-integration-test-results
@@ -857,13 +857,13 @@ jobs:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
       - name: Download test artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: linux-x64-tests
           path: _tests/
 
       - name: Download packages
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: packages
           path: _packages/
@@ -887,7 +887,7 @@ jobs:
           _tests/test.sh Linux Integration Test
 
       - name: Upload test results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: postgres${{ matrix.postgres-version }}-integration-test-results
@@ -906,7 +906,7 @@ jobs:
       BUILDNAME: ${{ needs.setup.outputs.branch_name_safe }}.${{ needs.setup.outputs.radarr_version }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           submodules: true
           fetch-depth: 1
@@ -921,7 +921,7 @@ jobs:
         shell: bash
 
       - name: Download frontend output
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: frontend-output
           path: _output/UI/
@@ -951,7 +951,7 @@ jobs:
         shell: bash
 
       - name: Upload installer
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: windows-installer
           path: _installer_output/
@@ -969,12 +969,12 @@ jobs:
       SENTRY_URL: ${{ vars.SENTRY_URL }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
       - name: Download frontend output
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: frontend-output
           path: _output/UI/
@@ -1006,12 +1006,12 @@ jobs:
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
       - name: SonarQube scan
-        uses: SonarSource/sonarqube-scan-action@v5
+        uses: SonarSource/sonarqube-scan-action@v6
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN_FRONTEND }}
           SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL }}
@@ -1030,7 +1030,7 @@ jobs:
     if: needs.setup.outputs.backend_changed == 'true'
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
           submodules: true
@@ -1099,7 +1099,7 @@ jobs:
     if: github.ref == 'refs/heads/develop' && needs.setup.outputs.backend_changed == 'true'
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
           submodules: true
@@ -1132,7 +1132,7 @@ jobs:
         shell: bash
 
       - name: Upload API docs
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: api-docs
