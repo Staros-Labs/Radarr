@@ -44,30 +44,24 @@ namespace NzbDrone.Core.Parser.Model
         [JsonIgnore]
         public PendingReleaseReason? PendingReleaseReason { get; set; }
 
+        // Keep private setters so serialized/manual release payloads can be deserialized safely.
+        private TimeSpan AgeSpan => DateTime.UtcNow - PublishDate;
+
         public int Age
         {
-            get { return DateTime.UtcNow.Subtract(PublishDate).Days; }
-
-            // This prevents manually downloading a release from blowing up in mono
-            // TODO: Is there a better way?
+            get { return AgeSpan.Days; }
             private set { }
         }
 
         public double AgeHours
         {
-            get { return DateTime.UtcNow.Subtract(PublishDate).TotalHours; }
-
-            // This prevents manually downloading a release from blowing up in mono
-            // TODO: Is there a better way?
+            get { return AgeSpan.TotalHours; }
             private set { }
         }
 
         public double AgeMinutes
         {
-            get { return DateTime.UtcNow.Subtract(PublishDate).TotalMinutes; }
-
-            // This prevents manually downloading a release from blowing up in mono
-            // TODO: Is there a better way?
+            get { return AgeSpan.TotalMinutes; }
             private set { }
         }
 

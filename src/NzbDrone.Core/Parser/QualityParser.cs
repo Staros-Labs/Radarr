@@ -761,8 +761,6 @@ namespace NzbDrone.Core.Parser
                 result.RevisionDetectionSource = QualityDetectionSource.Name;
             }
 
-            // TODO: re-enable this when we have a reliable way to determine real
-            // TODO: Only treat it as a real if it comes AFTER the season/episode number
             var realRegexResult = RealRegex.Matches(name);
 
             if (realRegexResult.Count > 0)

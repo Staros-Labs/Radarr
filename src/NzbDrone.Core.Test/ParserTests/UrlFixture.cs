@@ -23,6 +23,8 @@ namespace NzbDrone.Core.Test.ParserTests
         [TestCase("test123.ca - Movie Time 2023 720p HDTV x264 CRON", "Movie Time")]
         [TestCase("[www.test-hyphen123.co.za] - Movie Title 2023", "Movie Title")]
         [TestCase("(movieawake.com) Movie Title 2023 [720p] [English Subbed]", "Movie Title")]
+        [TestCase("[url]www.test.com[/url] - Movie.Title.2023.720p.HDTV.X264-DIMENSION", "Movie Title")]
+        [TestCase("[url=https://www.test.com]www.test.com[/url] - Movie.Title.2023.720p.HDTV.X264-DIMENSION", "Movie Title")]
         public void should_not_parse_url_in_name(string postTitle, string title)
         {
             var result = Parser.Parser.ParseMovieTitle(postTitle).MovieTitle.CleanMovieTitle();
