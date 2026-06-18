@@ -38,13 +38,30 @@ UpdateVersionNumber()
 
 EnableExtraPlatformsInSDK()
 {
-    SDK_PATH=$(dotnet --list-sdks | grep -P '6\.\d\.\d+' | head -1 | sed 's/\(6\.[0-9]*\.[0-9]*\).*\[\(.*\)\]/\2\/\1/g')
-    BUNDLEDVERSIONS="${SDK_PATH}/Microsoft.NETCoreSdk.BundledVersions.props"
-    if grep -q freebsd-x64 $BUNDLEDVERSIONS; then
+    local sdk_version
+    local sdk_path
+    local bundled_versions
+
+    sdk_version="${DOTNET_VERSION:-$(dotnet --version)}"
+
+    if [ -n "${DOTNET_ROOT:-}" ] && [ -f "${DOTNET_ROOT}/sdk/${sdk_version}/Microsoft.NETCoreSdk.BundledVersions.props" ]; then
+        sdk_path="${DOTNET_ROOT}/sdk/${sdk_version}"
+    else
+        sdk_path=$(dotnet --list-sdks | awk -v version="$sdk_version" '$1 == version { gsub(/\[|\]/, "", $2); print $2 "/" $1; exit }')
+    fi
+
+    bundled_versions="${sdk_path}/Microsoft.NETCoreSdk.BundledVersions.props"
+
+    if [ ! -f "$bundled_versions" ]; then
+        echo "Unable to locate Microsoft.NETCoreSdk.BundledVersions.props for SDK ${sdk_version}"
+        exit 1
+    fi
+
+    if grep -q freebsd-x64 "$bundled_versions"; then
         echo "Extra platforms already enabled"
     else
         echo "Enabling extra platform support"
-        sed -i.ORI 's/osx-x64/osx-x64;freebsd-x64/' "$BUNDLEDVERSIONS"
+        sed -i.ORI 's/osx-x64/osx-x64;freebsd-x64/' "$bundled_versions"
     fi
 }
 

@@ -6,6 +6,10 @@ on:
     - cron: '0 0 * * *'
 
 permissions: {}
+
+concurrency:
+  group: lock-threads
+
 jobs:
   lock:
     permissions:
@@ -14,7 +18,7 @@ jobs:
 
     runs-on: ubuntu-latest
     steps:
-      - uses: dessant/lock-threads@v4
+      - uses: dessant/lock-threads@v6
         with:
           github-token: ${{ github.token }}
           issue-inactive-days: '90'
