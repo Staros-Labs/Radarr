@@ -39,6 +39,7 @@ jobs:
       build_number: ${{ steps.build-meta.outputs.build_number }}
       radarr_version: ${{ steps.build-meta.outputs.radarr_version }}
       branch_name: ${{ steps.build-meta.outputs.branch_name }}
+      branch_name_safe: ${{ steps.build-meta.outputs.branch_name_safe }}
       backend_changed: ${{ steps.changes.outputs.backend_changed }}
     steps:
       - name: Checkout
@@ -53,33 +54,10 @@ jobs:
           HEAD_REF: ${{ github.head_ref }}
           REF_NAME: ${{ github.ref_name }}
           EVENT_NAME: ${{ github.event_name }}
-          BASE_REF: ${{ github.base_ref }}
+          RUN_NUMBER: ${{ github.run_number }}
         run: |
-          git fetch --tags --force
-
-          LAST=$(git tag -l 'build-counter-*' | sed 's/build-counter-//' | sort -n | tail -1)
-          BUILD_NUMBER=$(( ${LAST:-2999} + 1 ))
-
-          if [ "$EVENT_NAME" != "pull_request" ]; then
-            tag_pushed=false
-            for attempt in 1 2 3; do
-              if git tag "build-counter-${BUILD_NUMBER}" && git push origin "build-counter-${BUILD_NUMBER}"; then
-                echo "Tag pushed successfully on attempt $attempt"
-                tag_pushed=true
-                break
-              fi
-              echo "Tag push failed on attempt $attempt, retrying..."
-              git tag -d "build-counter-${BUILD_NUMBER}" 2>/dev/null || true
-              git fetch --tags --force
-              LAST=$(git tag -l 'build-counter-*' | sed 's/build-counter-//' | sort -n | tail -1)
-              BUILD_NUMBER=$(( LAST + 1 ))
-            done
-
-            if [ "$tag_pushed" != "true" ]; then
-              echo "::error::Failed to reserve a build counter tag after 3 attempts"
-              exit 1
-            fi
-          fi
+          # Keep fork build numbers in the existing 30xx range without mutating repo state.
+          BUILD_NUMBER=$(( 3000 + RUN_NUMBER ))
 
           if [ "$EVENT_NAME" = "pull_request" ]; then
             BRANCH_NAME="$HEAD_REF"
@@ -87,10 +65,12 @@ jobs:
             BRANCH_NAME="$REF_NAME"
           fi
 
+          BRANCH_NAME_SAFE=$(printf '%s' "$BRANCH_NAME" | sed 's#[^A-Za-z0-9._-]#-#g')
           {
             echo "build_number=$BUILD_NUMBER"
             echo "radarr_version=${MAJOR_VERSION}.${BUILD_NUMBER}"
             echo "branch_name=$BRANCH_NAME"
+            echo "branch_name_safe=$BRANCH_NAME_SAFE"
           } >> "$GITHUB_OUTPUT"
 
       - name: Detect backend changes
@@ -225,7 +205,7 @@ jobs:
     env:
       RADARRVERSION: ${{ needs.setup.outputs.radarr_version }}
       BUILD_SOURCEBRANCHNAME: ${{ needs.setup.outputs.branch_name }}
-      BUILDNAME: ${{ needs.setup.outputs.branch_name }}.${{ needs.setup.outputs.radarr_version }}
+      BUILDNAME: ${{ needs.setup.outputs.branch_name_safe }}.${{ needs.setup.outputs.radarr_version }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -389,7 +369,7 @@ jobs:
       packages: write
     env:
       RADARR_VERSION: ${{ needs.setup.outputs.radarr_version }}
-      BUILDNAME: ${{ needs.setup.outputs.branch_name }}.${{ needs.setup.outputs.radarr_version }}
+      BUILDNAME: ${{ needs.setup.outputs.branch_name_safe }}.${{ needs.setup.outputs.radarr_version }}
       REGISTRY: ghcr.io
       IMAGE_NAME: staros-labs/radarr
     strategy:
@@ -583,30 +563,43 @@ jobs:
     runs-on: ubuntu-24.04
     needs: [build-backend, setup]
     if: needs.setup.outputs.backend_changed == 'true'
-    container:
-      image: ghcr.io/servarr/testimages:alpine
+    env:
+      MUSL_TEST_IMAGE: ghcr.io/servarr/testimages:alpine
     timeout-minutes: 10
     steps:
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: ${{ env.DOTNET_VERSION }}
-
       - name: Download test artifact
         uses: actions/download-artifact@v4
         with:
           name: linux-musl-x64-tests
           path: _tests/
 
-      - name: Set executable permissions
+      - name: Download dotnet installer
         run: |
-          chmod a+x _tests/ffprobe
-          find _tests -name "Radarr.Test.Dummy" -exec chmod a+x {} \;
+          mkdir -p _temp
+          curl -fsSL https://dot.net/v1/dotnet-install.sh -o _temp/dotnet-install.sh
+          chmod a+x _temp/dotnet-install.sh
 
-      - name: Run unit tests
+      - name: Run unit tests in Alpine container
         run: |
-          chmod a+x _tests/test.sh
-          _tests/test.sh Linux Unit Test
+          docker run --rm \
+            --user "$(id -u):$(id -g)" \
+            -e DOTNET_VERSION="${DOTNET_VERSION}" \
+            -e HOME=/tmp/home \
+            -e TEST_DIR=/work/_tests \
+            -v "${PWD}:/work" \
+            -w /work \
+            "${MUSL_TEST_IMAGE}" \
+            sh -lc '
+              set -e
+              mkdir -p "$HOME"
+              export DOTNET_ROOT=/tmp/dotnet
+              export PATH="$DOTNET_ROOT:$PATH"
+              bash /work/_temp/dotnet-install.sh --version "$DOTNET_VERSION" --install-dir "$DOTNET_ROOT" --architecture x64 --os linux-musl --no-path
+              chmod a+x _tests/ffprobe
+              find _tests -name "Radarr.Test.Dummy" -exec chmod a+x {} \;
+              chmod a+x _tests/test.sh
+              _tests/test.sh Linux Unit Test
+            '
 
       - name: Upload test results
         uses: actions/upload-artifact@v4
@@ -768,15 +761,10 @@ jobs:
     runs-on: ubuntu-24.04
     needs: [packages, build-backend, setup]
     if: needs.setup.outputs.backend_changed == 'true'
-    container:
-      image: ghcr.io/servarr/testimages:alpine
+    env:
+      MUSL_TEST_IMAGE: ghcr.io/servarr/testimages:alpine
     timeout-minutes: 15
     steps:
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: ${{ env.DOTNET_VERSION }}
-
       - name: Download test artifact
         uses: actions/download-artifact@v4
         with:
@@ -797,15 +785,33 @@ jobs:
           mkdir -p ./bin/
           cp -r _extracted/Radarr/. ./bin/ 2>/dev/null || cp -r _extracted/. ./bin/
 
-      - name: Set executable permissions
+      - name: Download dotnet installer
         run: |
-          chmod a+x _tests/ffprobe
-          find _tests -name "Radarr.Test.Dummy" -exec chmod a+x {} \;
+          mkdir -p _temp
+          curl -fsSL https://dot.net/v1/dotnet-install.sh -o _temp/dotnet-install.sh
+          chmod a+x _temp/dotnet-install.sh
 
-      - name: Run integration tests
+      - name: Run integration tests in Alpine container
         run: |
-          chmod a+x _tests/test.sh
-          _tests/test.sh Linux Integration Test
+          docker run --rm \
+            --user "$(id -u):$(id -g)" \
+            -e DOTNET_VERSION="${DOTNET_VERSION}" \
+            -e HOME=/tmp/home \
+            -e TEST_DIR=/work/_tests \
+            -v "${PWD}:/work" \
+            -w /work \
+            "${MUSL_TEST_IMAGE}" \
+            sh -lc '
+              set -e
+              mkdir -p "$HOME"
+              export DOTNET_ROOT=/tmp/dotnet
+              export PATH="$DOTNET_ROOT:$PATH"
+              bash /work/_temp/dotnet-install.sh --version "$DOTNET_VERSION" --install-dir "$DOTNET_ROOT" --architecture x64 --os linux-musl --no-path
+              chmod a+x _tests/ffprobe
+              find _tests -name "Radarr.Test.Dummy" -exec chmod a+x {} \;
+              chmod a+x _tests/test.sh
+              _tests/test.sh Linux Integration Test
+            '
 
       - name: Upload test results
         uses: actions/upload-artifact@v4
@@ -897,7 +903,7 @@ jobs:
       RADARRVERSION: ${{ needs.setup.outputs.radarr_version }}
       MAJORVERSION: '6.1.1'
       BUILD_SOURCEBRANCHNAME: ${{ needs.setup.outputs.branch_name }}
-      BUILDNAME: ${{ needs.setup.outputs.branch_name }}.${{ needs.setup.outputs.radarr_version }}
+      BUILDNAME: ${{ needs.setup.outputs.branch_name_safe }}.${{ needs.setup.outputs.radarr_version }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -1074,13 +1080,15 @@ jobs:
         shell: pwsh
 
       - name: Generate coverage report
-        uses: danielpalme/ReportGenerator-GitHub-Action@5
         if: always()
-        with:
-          reports: CoverageResults/**/coverage.cobertura.xml
-          targetdir: CoverageResults/combined
-          reporttypes: HtmlInline;Cobertura;Badges
-          sourcedirs: src
+        run: |
+          dotnet tool install --tool-path ./.tools dotnet-reportgenerator-globaltool --version 5.*
+          ./.tools/reportgenerator `
+            "-reports:CoverageResults/**/coverage.cobertura.xml" `
+            "-targetdir:CoverageResults/combined" `
+            "-reporttypes:HtmlInline;Cobertura;Badges" `
+            "-sourcedirs:src"
+        shell: pwsh
 
   # ---------------------------------------------------------------------------
   # API Docs: generate OpenAPI spec, create PR

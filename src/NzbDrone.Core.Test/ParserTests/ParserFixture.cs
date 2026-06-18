@@ -279,6 +279,33 @@ namespace NzbDrone.Core.Test.ParserTests
             Parser.Parser.ParseMovieTitle(postTitle).HardcodedSubs.Should().Be(sub);
         }
 
+        [TestCase("The.Movie.from.U.N.C.L.E.2015.1080p.BluRay.x264-SPARKS", "SPARKS")]
+        [TestCase("R.I.P.D.2013.720p.BluRay.x264-SPARKS", "SPARKS")]
+        public void should_parse_release_group_for_titles_with_periods(string postTitle, string releaseGroup)
+        {
+            Parser.Parser.ParseMovieTitle(postTitle).ReleaseGroup.Should().Be(releaseGroup);
+        }
+
+        [TestCase("The.Movie.from.U.N.C.L.E.2015.1080p.BluRay.x264-SPARKS", "A.Movie.2015.1080p.BluRay.x264-SPARKS")]
+        [TestCase("R.I.P.D.2013.Special.Edition.720p.BluRay.x264-SPARKS", "A.Movie.2013.Special.Edition.720p.BluRay.x264-SPARKS")]
+        public void should_build_simple_release_title_for_titles_with_periods(string postTitle, string simpleReleaseTitle)
+        {
+            Parser.Parser.ParseMovieTitle(postTitle).SimpleReleaseTitle.Should().Be(simpleReleaseTitle);
+        }
+
+        [Test]
+        public void should_parse_edition_for_titles_with_periods_when_edition_follows_year()
+        {
+            var parsed = Parser.Parser.ParseMovieTitle("R.I.P.D.2013.Special.Edition.720p.BluRay.x264-SPARKS");
+
+            using (new AssertionScope())
+            {
+                parsed.Edition.Should().Be("Special Edition");
+                parsed.ReleaseGroup.Should().Be("SPARKS");
+                parsed.SimpleReleaseTitle.Should().Be("A.Movie.2013.Special.Edition.720p.BluRay.x264-SPARKS");
+            }
+        }
+
         [TestCase("That Italian Movie 2008 [tt1234567] 720p BluRay X264", "tt1234567")]
         [TestCase("That Italian Movie 2008 [tt12345678] 720p BluRay X264", "tt12345678")]
         public void should_parse_imdb_in_title(string postTitle, string imdb)

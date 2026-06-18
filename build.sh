@@ -15,13 +15,24 @@ ProgressEnd()
     echo "Finish '$1'"
 }
 
+EscapeSedReplacement()
+{
+    printf '%s' "$1" | sed -e 's/[&|\\]/\\&/g'
+}
+
 UpdateVersionNumber()
 {
     if [ "$RADARRVERSION" != "" ]; then
+        local escaped_version
+        local escaped_branch_name
+
+        escaped_version=$(EscapeSedReplacement "$RADARRVERSION")
+        escaped_branch_name=$(EscapeSedReplacement "$BUILD_SOURCEBRANCHNAME")
+
         echo "Updating Version Info"
-        sed -i'' -e "s/<AssemblyVersion>[0-9.*]\+<\/AssemblyVersion>/<AssemblyVersion>$RADARRVERSION<\/AssemblyVersion>/g" src/Directory.Build.props
-        sed -i'' -e "s/<AssemblyConfiguration>[\$()A-Za-z-]\+<\/AssemblyConfiguration>/<AssemblyConfiguration>${BUILD_SOURCEBRANCHNAME}<\/AssemblyConfiguration>/g" src/Directory.Build.props
-        sed -i'' -e "s/<string>10.0.0.0<\/string>/<string>$RADARRVERSION<\/string>/g" distribution/osx/Radarr.app/Contents/Info.plist
+        sed -i'' -e "s|<AssemblyVersion>[0-9.*]\+</AssemblyVersion>|<AssemblyVersion>${escaped_version}</AssemblyVersion>|g" src/Directory.Build.props
+        sed -i'' -e "s|<AssemblyConfiguration>[\$()A-Za-z/-]\+</AssemblyConfiguration>|<AssemblyConfiguration>${escaped_branch_name}</AssemblyConfiguration>|g" src/Directory.Build.props
+        sed -i'' -e "s|<string>10.0.0.0</string>|<string>${escaped_version}</string>|g" distribution/osx/Radarr.app/Contents/Info.plist
     fi
 }
 
