@@ -54,33 +54,10 @@ jobs:
           HEAD_REF: ${{ github.head_ref }}
           REF_NAME: ${{ github.ref_name }}
           EVENT_NAME: ${{ github.event_name }}
-          BASE_REF: ${{ github.base_ref }}
+          RUN_NUMBER: ${{ github.run_number }}
         run: |
-          git fetch --tags --force
-
-          LAST=$(git tag -l 'build-counter-*' | sed 's/build-counter-//' | sort -n | tail -1)
-          BUILD_NUMBER=$(( ${LAST:-2999} + 1 ))
-
-          if [ "$EVENT_NAME" != "pull_request" ]; then
-            tag_pushed=false
-            for attempt in 1 2 3; do
-              if git tag "build-counter-${BUILD_NUMBER}" && git push origin "build-counter-${BUILD_NUMBER}"; then
-                echo "Tag pushed successfully on attempt $attempt"
-                tag_pushed=true
-                break
-              fi
-              echo "Tag push failed on attempt $attempt, retrying..."
-              git tag -d "build-counter-${BUILD_NUMBER}" 2>/dev/null || true
-              git fetch --tags --force
-              LAST=$(git tag -l 'build-counter-*' | sed 's/build-counter-//' | sort -n | tail -1)
-              BUILD_NUMBER=$(( LAST + 1 ))
-            done
-
-            if [ "$tag_pushed" != "true" ]; then
-              echo "::error::Failed to reserve a build counter tag after 3 attempts"
-              exit 1
-            fi
-          fi
+          # Keep fork build numbers in the existing 30xx range without mutating repo state.
+          BUILD_NUMBER=$(( 3000 + RUN_NUMBER ))
 
           if [ "$EVENT_NAME" = "pull_request" ]; then
             BRANCH_NAME="$HEAD_REF"
