@@ -39,6 +39,7 @@ jobs:
       build_number: ${{ steps.counter.outputs.build_number }}
       radarr_version: ${{ steps.counter.outputs.radarr_version }}
       branch_name: ${{ steps.counter.outputs.branch_name }}
+      branch_name_safe: ${{ steps.counter.outputs.branch_name_safe }}
       backend_changed: ${{ steps.changes.outputs.backend_changed }}
     steps:
       - name: Checkout
@@ -61,10 +62,14 @@ jobs:
           echo "radarr_version=${MAJOR_VERSION}.${NEXT}" >> "$GITHUB_OUTPUT"
 
           if [ "$EVENT_NAME" = "pull_request" ]; then
-            echo "branch_name=$HEAD_REF" >> "$GITHUB_OUTPUT"
+            BRANCH_NAME="$HEAD_REF"
           else
-            echo "branch_name=$REF_NAME" >> "$GITHUB_OUTPUT"
+            BRANCH_NAME="$REF_NAME"
           fi
+
+          BRANCH_NAME_SAFE=$(printf '%s' "$BRANCH_NAME" | sed 's#[^A-Za-z0-9._-]#-#g')
+          echo "branch_name=$BRANCH_NAME" >> "$GITHUB_OUTPUT"
+          echo "branch_name_safe=$BRANCH_NAME_SAFE" >> "$GITHUB_OUTPUT"
 
       - name: Push build counter tag
         if: github.event_name != 'pull_request'
@@ -220,7 +225,7 @@ jobs:
     env:
       RADARRVERSION: ${{ needs.setup.outputs.radarr_version }}
       BUILD_SOURCEBRANCHNAME: ${{ needs.setup.outputs.branch_name }}
-      BUILDNAME: ${{ needs.setup.outputs.branch_name }}.${{ needs.setup.outputs.radarr_version }}
+      BUILDNAME: ${{ needs.setup.outputs.branch_name_safe }}.${{ needs.setup.outputs.radarr_version }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -372,7 +377,7 @@ jobs:
       packages: write
     env:
       RADARR_VERSION: ${{ needs.setup.outputs.radarr_version }}
-      BUILDNAME: ${{ needs.setup.outputs.branch_name }}.${{ needs.setup.outputs.radarr_version }}
+      BUILDNAME: ${{ needs.setup.outputs.branch_name_safe }}.${{ needs.setup.outputs.radarr_version }}
       REGISTRY: ghcr.io
       IMAGE_NAME: staros-labs/radarr
     strategy:
@@ -880,7 +885,7 @@ jobs:
       RADARRVERSION: ${{ needs.setup.outputs.radarr_version }}
       MAJORVERSION: '6.1.1'
       BUILD_SOURCEBRANCHNAME: ${{ needs.setup.outputs.branch_name }}
-      BUILDNAME: ${{ needs.setup.outputs.branch_name }}.${{ needs.setup.outputs.radarr_version }}
+      BUILDNAME: ${{ needs.setup.outputs.branch_name_safe }}.${{ needs.setup.outputs.radarr_version }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
