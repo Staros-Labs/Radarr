@@ -588,31 +588,42 @@ jobs:
     needs: [build-backend, setup]
     if: needs.setup.outputs.backend_changed == 'true'
     env:
-      ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: 'true'
-    container:
-      image: ghcr.io/servarr/testimages:alpine
+      MUSL_TEST_IMAGE: ghcr.io/servarr/testimages:alpine
     timeout-minutes: 10
     steps:
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: ${{ env.DOTNET_VERSION }}
-
       - name: Download test artifact
         uses: actions/download-artifact@v4
         with:
           name: linux-musl-x64-tests
           path: _tests/
 
-      - name: Set executable permissions
+      - name: Download dotnet installer
         run: |
-          chmod a+x _tests/ffprobe
-          find _tests -name "Radarr.Test.Dummy" -exec chmod a+x {} \;
+          mkdir -p _temp
+          curl -fsSL https://dot.net/v1/dotnet-install.sh -o _temp/dotnet-install.sh
+          chmod a+x _temp/dotnet-install.sh
 
-      - name: Run unit tests
+      - name: Run unit tests in Alpine container
         run: |
-          chmod a+x _tests/test.sh
-          _tests/test.sh Linux Unit Test
+          docker run --rm \
+            --user "$(id -u):$(id -g)" \
+            -e DOTNET_VERSION="${DOTNET_VERSION}" \
+            -e HOME=/tmp/home \
+            -e TEST_DIR=/work/_tests \
+            -v "${PWD}:/work" \
+            -w /work \
+            "${MUSL_TEST_IMAGE}" \
+            sh -lc '
+              set -e
+              mkdir -p "$HOME"
+              export DOTNET_ROOT=/tmp/dotnet
+              export PATH="$DOTNET_ROOT:$PATH"
+              bash /work/_temp/dotnet-install.sh --version "$DOTNET_VERSION" --install-dir "$DOTNET_ROOT" --architecture x64 --os linux-musl --no-path
+              chmod a+x _tests/ffprobe
+              find _tests -name "Radarr.Test.Dummy" -exec chmod a+x {} \;
+              chmod a+x _tests/test.sh
+              _tests/test.sh Linux Unit Test
+            '
 
       - name: Upload test results
         uses: actions/upload-artifact@v4
@@ -775,16 +786,9 @@ jobs:
     needs: [packages, build-backend, setup]
     if: needs.setup.outputs.backend_changed == 'true'
     env:
-      ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: 'true'
-    container:
-      image: ghcr.io/servarr/testimages:alpine
+      MUSL_TEST_IMAGE: ghcr.io/servarr/testimages:alpine
     timeout-minutes: 15
     steps:
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: ${{ env.DOTNET_VERSION }}
-
       - name: Download test artifact
         uses: actions/download-artifact@v4
         with:
@@ -805,15 +809,33 @@ jobs:
           mkdir -p ./bin/
           cp -r _extracted/Radarr/. ./bin/ 2>/dev/null || cp -r _extracted/. ./bin/
 
-      - name: Set executable permissions
+      - name: Download dotnet installer
         run: |
-          chmod a+x _tests/ffprobe
-          find _tests -name "Radarr.Test.Dummy" -exec chmod a+x {} \;
+          mkdir -p _temp
+          curl -fsSL https://dot.net/v1/dotnet-install.sh -o _temp/dotnet-install.sh
+          chmod a+x _temp/dotnet-install.sh
 
-      - name: Run integration tests
+      - name: Run integration tests in Alpine container
         run: |
-          chmod a+x _tests/test.sh
-          _tests/test.sh Linux Integration Test
+          docker run --rm \
+            --user "$(id -u):$(id -g)" \
+            -e DOTNET_VERSION="${DOTNET_VERSION}" \
+            -e HOME=/tmp/home \
+            -e TEST_DIR=/work/_tests \
+            -v "${PWD}:/work" \
+            -w /work \
+            "${MUSL_TEST_IMAGE}" \
+            sh -lc '
+              set -e
+              mkdir -p "$HOME"
+              export DOTNET_ROOT=/tmp/dotnet
+              export PATH="$DOTNET_ROOT:$PATH"
+              bash /work/_temp/dotnet-install.sh --version "$DOTNET_VERSION" --install-dir "$DOTNET_ROOT" --architecture x64 --os linux-musl --no-path
+              chmod a+x _tests/ffprobe
+              find _tests -name "Radarr.Test.Dummy" -exec chmod a+x {} \;
+              chmod a+x _tests/test.sh
+              _tests/test.sh Linux Integration Test
+            '
 
       - name: Upload test results
         uses: actions/upload-artifact@v4
