@@ -587,6 +587,8 @@ jobs:
     runs-on: ubuntu-24.04
     needs: [build-backend, setup]
     if: needs.setup.outputs.backend_changed == 'true'
+    env:
+      ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: 'true'
     container:
       image: ghcr.io/servarr/testimages:alpine
     timeout-minutes: 10
@@ -772,6 +774,8 @@ jobs:
     runs-on: ubuntu-24.04
     needs: [packages, build-backend, setup]
     if: needs.setup.outputs.backend_changed == 'true'
+    env:
+      ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: 'true'
     container:
       image: ghcr.io/servarr/testimages:alpine
     timeout-minutes: 15
