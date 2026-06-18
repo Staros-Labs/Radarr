@@ -336,6 +336,124 @@ jobs:
           git tag -a "${TAG}" -m "Release ${TAG}"
           git push origin "${TAG}"
 
+      - name: Generate release notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.release-type.outputs.tag }}
+          PRERELEASE: ${{ steps.release-type.outputs.prerelease }}
+          REPOSITORY: ${{ github.repository }}
+          SERVER_URL: ${{ github.server_url }}
+        run: |
+          set -euo pipefail
+
+          if [ "${PRERELEASE}" = "true" ]; then
+            PREVIOUS_TAG=$(git tag --list 'v*-nightly' --sort=-version:refname | grep -Fxv "${TAG}" | head -n 1 || true)
+            RELEASE_NOTES_ARGS=(
+              --method POST
+              -H "Accept: application/vnd.github+json"
+              "/repos/${REPOSITORY}/releases/generate-notes"
+              -f "tag_name=${TAG}"
+              -f "target_commitish=${GITHUB_SHA}"
+            )
+
+            if [ -n "${PREVIOUS_TAG}" ]; then
+              RELEASE_NOTES_ARGS+=(-f "previous_tag_name=${PREVIOUS_TAG}")
+            fi
+
+            gh api "${RELEASE_NOTES_ARGS[@]}" --jq '.body' > release-notes.md
+            exit 0
+          fi
+
+          # Stable releases are cut from master after develop promotion, so the
+          # default GitHub-generated notes collapse the whole release into a
+          # single promotion PR. Build notes from the first-parent master range.
+          PREVIOUS_TAG=$(git tag --list 'v*' --sort=-version:refname | grep -Ev -- '-nightly$' | grep -Fxv "${TAG}" | head -n 1 || true)
+
+          if [ -z "${PREVIOUS_TAG}" ]; then
+            gh api \
+              --method POST \
+              -H "Accept: application/vnd.github+json" \
+              "/repos/${REPOSITORY}/releases/generate-notes" \
+              -f "tag_name=${TAG}" \
+              -f "target_commitish=${GITHUB_SHA}" \
+              --jq '.body' > release-notes.md
+            exit 0
+          fi
+
+          export PREVIOUS_TAG
+          python3 <<'PY'
+          import os
+          import subprocess
+
+          previous_tag = os.environ["PREVIOUS_TAG"]
+          tag = os.environ["TAG"]
+          repository = os.environ["REPOSITORY"]
+          server_url = os.environ["SERVER_URL"].rstrip("/")
+
+          log_output = subprocess.check_output(
+              [
+                  "git",
+                  "log",
+                  "--first-parent",
+                  "--reverse",
+                  f"{previous_tag}..HEAD",
+                  "--format=%H%x1f%s%x1f%b%x1e",
+              ],
+              text=True,
+          )
+
+          entries = []
+          for record in log_output.strip("\n\x1e").split("\x1e"):
+              if not record.strip():
+                  continue
+
+              sha, subject, body = record.split("\x1f", 2)
+              sections = []
+              current_item = None
+
+              for raw_line in body.splitlines():
+                  line = raw_line.strip()
+                  if not line or line == "---------" or line.startswith("Co-authored-by:"):
+                      continue
+
+                  if line.startswith("* ") or line.startswith("- "):
+                      if current_item is not None:
+                          sections.append(current_item)
+                      current_item = line[2:].strip()
+                      continue
+
+                  if current_item is not None:
+                      current_item = f"{current_item} {line}"
+                  else:
+                      sections.append(line)
+
+              if current_item is not None:
+                  sections.append(current_item)
+
+              entries.append((subject.strip(), sections))
+
+          if not entries:
+              raise SystemExit("No commits found for stable release notes")
+
+          lines = ["## What's Changed", ""]
+
+          for subject, sections in entries:
+              if sections:
+                  lines.append(f"### {subject}")
+                  for section in sections:
+                      lines.append(f"- {section}")
+                  lines.append("")
+              else:
+                  lines.append(f"- {subject}")
+
+          lines.append("")
+
+          lines.append(f"**Full Changelog**: {server_url}/{repository}/compare/{previous_tag}...{tag}")
+
+          with open("release-notes.md", "w", encoding="utf-8") as handle:
+              handle.write("\n".join(lines) + "\n")
+          PY
+
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -346,7 +464,7 @@ jobs:
             "${TAG}"
             --repo "${{ github.repository }}"
             --title "Radarr v${RADARR_VERSION}"
-            --generate-notes
+            --notes-file release-notes.md
           )
 
           if [ "${PRERELEASE}" = "true" ]; then
