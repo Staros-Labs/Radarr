@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
+import { useDispatch, useSelector, useStore } from 'react-redux';
 import { useSelect } from 'App/SelectContext';
 import AppState from 'App/State/AppState';
 import { MOVIE_SEARCH } from 'Commands/commandNames';
@@ -9,6 +9,7 @@ import { icons, kinds } from 'Helpers/Props';
 import { executeCommand } from 'Store/Actions/commandActions';
 import { fetchMovieIndexIds } from 'Store/Actions/movieIndexActions';
 import createCommandExecutingSelector from 'Store/Selectors/createCommandExecutingSelector';
+import { executeThunk } from 'Store/thunks';
 import translate from 'Utilities/String/translate';
 import getSelectedIds from 'Utilities/Table/getSelectedIds';
 
@@ -24,6 +25,7 @@ function MovieIndexSearchButton(props: MovieIndexSearchButtonProps) {
     useSelector((state: AppState) => state.movieIndex.totalRecords) ?? 0;
 
   const dispatch = useDispatch();
+  const store = useStore<AppState>();
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
 
   const { isSelectMode, selectedFilterKey } = props;
@@ -55,7 +57,11 @@ function MovieIndexSearchButton(props: MovieIndexSearchButtonProps) {
     const request =
       isSelectMode && selectedMovieIds.length > 0
         ? null
-        : dispatch(fetchMovieIndexIds());
+        : executeThunk<number[]>(
+            fetchMovieIndexIds(),
+            dispatch,
+            store.getState
+          );
 
     if (!request) {
       dispatch(
@@ -68,7 +74,7 @@ function MovieIndexSearchButton(props: MovieIndexSearchButtonProps) {
       return;
     }
 
-    request.done((movieIds) => {
+    request.done((movieIds: number[]) => {
       dispatch(
         executeCommand({
           name: MOVIE_SEARCH,
@@ -76,7 +82,7 @@ function MovieIndexSearchButton(props: MovieIndexSearchButtonProps) {
         })
       );
     });
-  }, [dispatch, isSelectMode, selectedMovieIds]);
+  }, [dispatch, isSelectMode, selectedMovieIds, store]);
 
   const onConfirmPress = useCallback(() => {
     setIsConfirmModalOpen(true);

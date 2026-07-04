@@ -5,13 +5,13 @@ import { createSelector } from 'reselect';
 import * as commandNames from 'Commands/commandNames';
 import withScrollPosition from 'Components/withScrollPosition';
 import { executeCommand } from 'Store/Actions/commandActions';
+import { fetchMovies } from 'Store/Actions/movieActions';
 import {
   fetchMovieCollections,
   saveMovieCollections,
   setMovieCollectionsFilter,
   setMovieCollectionsSort
 } from 'Store/Actions/movieCollectionActions';
-import { fetchMovies } from 'Store/Actions/movieActions';
 import { clearQueueDetails, fetchQueueDetails } from 'Store/Actions/queueActions';
 import scrollPositions from 'Store/scrollPositions';
 import createCollectionClientSideCollectionItemsSelector from 'Store/Selectors/createCollectionClientSideCollectionItemsSelector';

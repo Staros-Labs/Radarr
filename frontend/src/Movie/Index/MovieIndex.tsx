@@ -22,8 +22,8 @@ import PageToolbarSeparator from 'Components/Page/Toolbar/PageToolbarSeparator';
 import TableOptionsModalWrapper from 'Components/Table/TableOptions/TableOptionsModalWrapper';
 import TablePager from 'Components/Table/TablePager';
 import usePaging from 'Components/Table/usePaging';
-import useCurrentPage from 'Helpers/Hooks/useCurrentPage';
 import withScrollPosition from 'Components/withScrollPosition';
+import useCurrentPage from 'Helpers/Hooks/useCurrentPage';
 import { align, icons, kinds } from 'Helpers/Props';
 import { DESCENDING } from 'Helpers/Props/sortDirections';
 import InteractiveImportModal from 'InteractiveImport/InteractiveImportModal';
@@ -38,10 +38,10 @@ import {
   setMovieView,
 } from 'Store/Actions/movieIndexActions';
 import { fetchQueueDetails } from 'Store/Actions/queueActions';
-import createCommandExecutingSelector from 'Store/Selectors/createCommandExecutingSelector';
-import { createCustomFiltersSelector } from 'Store/Selectors/createClientSideCollectionSelector';
-import createDimensionsSelector from 'Store/Selectors/createDimensionsSelector';
 import scrollPositions from 'Store/scrollPositions';
+import { createCustomFiltersSelector } from 'Store/Selectors/createClientSideCollectionSelector';
+import createCommandExecutingSelector from 'Store/Selectors/createCommandExecutingSelector';
+import createDimensionsSelector from 'Store/Selectors/createDimensionsSelector';
 import selectUniqueIds from 'Utilities/Object/selectUniqueIds';
 import {
   registerPagePopulator,
@@ -101,9 +101,7 @@ const MovieIndex = withScrollPosition((props: MovieIndexProps) => {
     totalPages,
     totalRecords,
     filters,
-  }: MovieIndexAppState = useSelector(
-    (state: AppState) => state.movieIndex
-  );
+  }: MovieIndexAppState = useSelector((state: AppState) => state.movieIndex);
   const customFilters = useSelector(createCustomFiltersSelector('movieIndex'));
 
   const isRssSyncExecuting = useSelector(
@@ -434,7 +432,7 @@ const MovieIndex = withScrollPosition((props: MovieIndexProps) => {
 
             {!error && isPopulated && !items.length ? (
               <NoMovie
-                totalItems={selectedFilterKey === 'all' ? totalRecords : 1}
+                totalItems={selectedFilterKey === 'all' ? totalRecords ?? 0 : 1}
               />
             ) : null}
           </PageContentBody>

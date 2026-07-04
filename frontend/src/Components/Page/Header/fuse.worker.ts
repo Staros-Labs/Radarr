@@ -17,7 +17,7 @@ function getSuggestions(movies: SuggestedMovie[], value: string) {
   if (value.length === 1) {
     for (let i = 0; i < movies.length; i++) {
       const m = movies[i];
-      if (m.firstCharacter === value.toLowerCase()) {
+      if (m.sortTitle.charAt(0).toLowerCase() === value.toLowerCase()) {
         suggestions.push({
           item: movies[i],
           indices: [[0, 0]],

@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
+import { useDispatch, useSelector, useStore } from 'react-redux';
 import { useSelect } from 'App/SelectContext';
 import AppState from 'App/State/AppState';
 import { REFRESH_MOVIE } from 'Commands/commandNames';
@@ -8,6 +8,7 @@ import { icons } from 'Helpers/Props';
 import { executeCommand } from 'Store/Actions/commandActions';
 import { fetchMovieIndexIds } from 'Store/Actions/movieIndexActions';
 import createCommandExecutingSelector from 'Store/Selectors/createCommandExecutingSelector';
+import { executeThunk } from 'Store/thunks';
 import translate from 'Utilities/String/translate';
 import getSelectedIds from 'Utilities/Table/getSelectedIds';
 
@@ -25,6 +26,7 @@ function MovieIndexRefreshMovieButton(
   const { totalRecords } = useSelector((state: AppState) => state.movieIndex);
 
   const dispatch = useDispatch();
+  const store = useStore<AppState>();
   const { isSelectMode, selectedFilterKey } = props;
   const [selectState] = useSelect();
   const { selectedState } = selectState;
@@ -47,7 +49,11 @@ function MovieIndexRefreshMovieButton(
     const request =
       isSelectMode && selectedMovieIds.length
         ? null
-        : dispatch(fetchMovieIndexIds());
+        : executeThunk<number[]>(
+            fetchMovieIndexIds(),
+            dispatch,
+            store.getState
+          );
 
     if (!request) {
       dispatch(
@@ -60,7 +66,7 @@ function MovieIndexRefreshMovieButton(
       return;
     }
 
-    request.done((movieIds) => {
+    request.done((movieIds: number[]) => {
       dispatch(
         executeCommand({
           name: REFRESH_MOVIE,
@@ -68,7 +74,7 @@ function MovieIndexRefreshMovieButton(
         })
       );
     });
-  }, [dispatch, isSelectMode, selectedMovieIds]);
+  }, [dispatch, isSelectMode, selectedMovieIds, store]);
 
   return (
     <PageToolbarButton

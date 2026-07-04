@@ -100,6 +100,11 @@ import MovieTags from './MovieTags';
 import MovieTitlesTable from './Titles/MovieTitlesTable';
 import styles from './MovieDetails.css';
 
+interface MovieNavigation {
+  nextMovie?: { title: string; titleSlug: string };
+  previousMovie?: { title: string; titleSlug: string };
+}
+
 const defaultFontSize = parseInt(fonts.defaultFontSize);
 const lineHeight = parseFloat(fonts.lineHeight);
 
@@ -223,10 +228,7 @@ function MovieDetails({ movieId }: MovieDetailsProps) {
     };
   }, [movieId, commands]);
 
-  const [navigation, setNavigation] = useState<{
-    nextMovie?: { title: string; titleSlug: string };
-    previousMovie?: { title: string; titleSlug: string };
-  }>({});
+  const [navigation, setNavigation] = useState<MovieNavigation>({});
 
   const touchStart = useRef<number | null>(null);
   const [isOrganizeModalOpen, setIsOrganizeModalOpen] = useState(false);
@@ -253,7 +255,7 @@ function MovieDetails({ movieId }: MovieDetailsProps) {
       traditional: true,
     });
 
-    request.done((data) => {
+    request.done((data: MovieNavigation) => {
       setNavigation(data);
     });
 

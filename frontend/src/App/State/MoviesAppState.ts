@@ -1,7 +1,7 @@
 import AppSectionState, {
   AppSectionDeleteState,
-  PagedAppSectionState,
   AppSectionSaveState,
+  PagedAppSectionState,
 } from 'App/State/AppSectionState';
 import Column from 'Components/Table/Column';
 import { SortDirection } from 'Helpers/Props/sortDirections';

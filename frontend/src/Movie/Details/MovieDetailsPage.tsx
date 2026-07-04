@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
+import { useDispatch, useSelector, useStore } from 'react-redux';
 import { useParams } from 'react-router';
 import { createSelector } from 'reselect';
 import AppState from 'App/State/AppState';
@@ -7,8 +7,13 @@ import LoadingIndicator from 'Components/Loading/LoadingIndicator';
 import NotFound from 'Components/NotFound';
 import usePrevious from 'Helpers/Hooks/usePrevious';
 import { fetchMovieByTitleSlug } from 'Store/Actions/movieActions';
+import { executeThunk } from 'Store/thunks';
 import translate from 'Utilities/String/translate';
 import MovieDetails from './MovieDetails';
+
+interface RequestFailure {
+  status?: number;
+}
 
 function createMovieIdSelector(titleSlug: string) {
   return createSelector(
@@ -21,6 +26,7 @@ function createMovieIdSelector(titleSlug: string) {
 
 function MovieDetailsPage() {
   const dispatch = useDispatch();
+  const store = useStore<AppState>();
   const { titleSlug } = useParams<{ titleSlug: string }>();
   const movieId = useSelector(createMovieIdSelector(titleSlug));
   const previousMovieId = usePrevious(movieId);
@@ -37,18 +43,22 @@ function MovieDetailsPage() {
       return;
     }
 
-    const request = dispatch(fetchMovieByTitleSlug({ titleSlug }));
+    const request = executeThunk(
+      fetchMovieByTitleSlug({ titleSlug }),
+      dispatch,
+      store.getState
+    );
 
     request.done(() => {
       setIsLoading(false);
       setIsNotFound(false);
     });
 
-    request.fail((xhr) => {
+    request.fail((xhr: RequestFailure) => {
       setIsLoading(false);
       setIsNotFound(xhr.status === 404);
     });
-  }, [dispatch, movieId, titleSlug]);
+  }, [dispatch, movieId, store, titleSlug]);
 
   if (isLoading && movieId == null) {
     return <LoadingIndicator />;

@@ -6,6 +6,7 @@ import sortByProp from 'Utilities/Array/sortByProp';
 import createAjaxRequest from 'Utilities/createAjaxRequest';
 import serverSideCollectionHandlers from 'Utilities/serverSideCollectionHandlers';
 import translate from 'Utilities/String/translate';
+import { set, update, updateServerSideCollection } from './baseActions';
 import createHandleActions from './Creators/createHandleActions';
 import createServerSideCollectionHandlers from './Creators/createServerSideCollectionHandlers';
 import createSetTableOptionReducer from './Creators/Reducers/createSetTableOptionReducer';
@@ -13,9 +14,8 @@ import {
   filterPredicates,
   filters,
   mergeMovies,
-  sortPredicates,
+  sortPredicates
 } from './movieActions';
-import { set, update, updateServerSideCollection } from './baseActions';
 
 //
 // Variables
@@ -745,7 +745,7 @@ handleThunks({
       data,
       traditional: true
     }).request;
-  },
+  }
 });
 
 export const reducers = createHandleActions({

@@ -18,6 +18,7 @@ import Icon from 'Components/Icon';
 import LoadingIndicator from 'Components/Loading/LoadingIndicator';
 import useKeyboardShortcuts from 'Helpers/Hooks/useKeyboardShortcuts';
 import { icons } from 'Helpers/Props';
+import { Image } from 'Movie/Movie';
 import createAjaxRequest from 'Utilities/createAjaxRequest';
 import translate from 'Utilities/String/translate';
 import MovieSearchResult from './MovieSearchResult';
@@ -40,11 +41,16 @@ export interface SuggestedMovie {
   year: number;
   titleSlug: string;
   sortTitle: string;
-  images: Array<unknown>;
+  images: Image[];
   alternateTitles: Array<{ title: string }>;
   tmdbId: number;
   imdbId: string;
   tags: Tag[];
+}
+
+interface MovieSearchResponseItem extends SuggestedMovie {
+  matchedKey: string;
+  matchedIndex: number;
 }
 
 interface MovieSuggestion {
@@ -123,12 +129,12 @@ function MovieSearchInput() {
 
     abortRequestRef.current = abortRequest;
 
-    request.done((data) => {
+    request.done((data: MovieSearchResponseItem[]) => {
       if (latestQueryRef.current !== trimmed) {
         return;
       }
 
-      const nextSuggestions = data.map((item) => {
+      const nextSuggestions: MovieSuggestion[] = data.map((item) => {
         return {
           title: item.title,
           indices: [],
