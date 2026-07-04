@@ -2,9 +2,9 @@ import { createAction } from 'redux-actions';
 import { batchActions } from 'redux-batched-actions';
 import { filterBuilderTypes, filterBuilderValueTypes, sortDirections } from 'Helpers/Props';
 import { createThunk, handleThunks } from 'Store/thunks';
-import serverSideCollectionHandlers from 'Utilities/serverSideCollectionHandlers';
-import createAjaxRequest from 'Utilities/createAjaxRequest';
 import sortByProp from 'Utilities/Array/sortByProp';
+import createAjaxRequest from 'Utilities/createAjaxRequest';
+import serverSideCollectionHandlers from 'Utilities/serverSideCollectionHandlers';
 import translate from 'Utilities/String/translate';
 import createHandleActions from './Creators/createHandleActions';
 import createServerSideCollectionHandlers from './Creators/createServerSideCollectionHandlers';
@@ -680,7 +680,7 @@ handleThunks({
       [serverSideCollectionHandlers.LAST_PAGE]: GOTO_LAST_MOVIE_INDEX_PAGE,
       [serverSideCollectionHandlers.EXACT_PAGE]: GOTO_MOVIE_INDEX_PAGE,
       [serverSideCollectionHandlers.SORT]: SET_MOVIE_SORT,
-      [serverSideCollectionHandlers.FILTER]: SET_MOVIE_FILTER,
+      [serverSideCollectionHandlers.FILTER]: SET_MOVIE_FILTER
     },
     augmentFetchData
   ),
@@ -693,7 +693,7 @@ handleThunks({
       page: payload.page || movieIndex.page || 1,
       pageSize: movieIndex.pageSize,
       sortKey: movieIndex.sortKey,
-      sortDirection: movieIndex.sortDirection,
+      sortDirection: movieIndex.sortDirection
     };
 
     augmentFetchData(getState, payload, data);
@@ -701,7 +701,7 @@ handleThunks({
     const promise = createAjaxRequest({
       url: '/movie/paged',
       data,
-      traditional: true,
+      traditional: true
     }).request;
 
     promise.done((response) => {
@@ -714,7 +714,7 @@ handleThunks({
           section,
           isFetching: false,
           isPopulated: true,
-          error: null,
+          error: null
         })
       ]));
     });
@@ -724,7 +724,7 @@ handleThunks({
         section,
         isFetching: false,
         isPopulated: false,
-        error: xhr,
+        error: xhr
       }));
     });
 
@@ -735,7 +735,7 @@ handleThunks({
     const movieIndex = getState().movieIndex;
     const data = {
       sortKey: payload?.sortKey ?? movieIndex.sortKey,
-      sortDirection: payload?.sortDirection ?? movieIndex.sortDirection,
+      sortDirection: payload?.sortDirection ?? movieIndex.sortDirection
     };
 
     augmentFetchData(getState, payload, data);
@@ -743,7 +743,7 @@ handleThunks({
     return createAjaxRequest({
       url: '/movie/ids',
       data,
-      traditional: true,
+      traditional: true
     }).request;
   },
 });

@@ -20,7 +20,8 @@ interface MovieIndexSearchButtonProps {
 
 function MovieIndexSearchButton(props: MovieIndexSearchButtonProps) {
   const isSearching = useSelector(createCommandExecutingSelector(MOVIE_SEARCH));
-  const { totalRecords } = useSelector((state: AppState) => state.movieIndex);
+  const totalRecords =
+    useSelector((state: AppState) => state.movieIndex.totalRecords) ?? 0;
 
   const dispatch = useDispatch();
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
@@ -90,7 +91,7 @@ function MovieIndexSearchButton(props: MovieIndexSearchButtonProps) {
       <PageToolbarButton
         label={isSelectMode ? searchSelectLabel : searchIndexLabel}
         isSpinning={isSearching}
-        isDisabled={!totalRecords}
+        isDisabled={!searchCount}
         iconName={icons.SEARCH}
         onPress={searchCount > 5 ? onConfirmPress : onPress}
       />
