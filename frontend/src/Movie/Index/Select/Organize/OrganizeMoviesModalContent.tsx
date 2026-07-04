@@ -4,6 +4,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { RENAME_MOVIE } from 'Commands/commandNames';
 import Alert from 'Components/Alert';
 import Icon from 'Components/Icon';
+import useEnsureMoviesLoaded from 'Helpers/Hooks/useEnsureMoviesLoaded';
 import Button from 'Components/Link/Button';
 import ModalBody from 'Components/Modal/ModalBody';
 import ModalContent from 'Components/Modal/ModalContent';
@@ -23,6 +24,7 @@ interface OrganizeMoviesModalContentProps {
 
 function OrganizeMoviesModalContent(props: OrganizeMoviesModalContentProps) {
   const { movieIds, onModalClose } = props;
+  useEnsureMoviesLoaded();
 
   const allMovies: Movie[] = useSelector(createAllMoviesSelector());
   const dispatch = useDispatch();

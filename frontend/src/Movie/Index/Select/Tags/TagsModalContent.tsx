@@ -6,6 +6,7 @@ import Form from 'Components/Form/Form';
 import FormGroup from 'Components/Form/FormGroup';
 import FormInputGroup from 'Components/Form/FormInputGroup';
 import FormLabel from 'Components/Form/FormLabel';
+import useEnsureMoviesLoaded from 'Helpers/Hooks/useEnsureMoviesLoaded';
 import Label from 'Components/Label';
 import Button from 'Components/Link/Button';
 import ModalBody from 'Components/Modal/ModalBody';
@@ -27,6 +28,7 @@ interface TagsModalContentProps {
 
 function TagsModalContent(props: TagsModalContentProps) {
   const { movieIds, onModalClose, onApplyTagsPress } = props;
+  useEnsureMoviesLoaded();
 
   const allMovies: Movie[] = useSelector(createAllMoviesSelector());
   const tagList: Tag[] = useSelector(createTagsSelector());

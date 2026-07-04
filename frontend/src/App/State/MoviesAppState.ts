@@ -1,5 +1,6 @@
 import AppSectionState, {
   AppSectionDeleteState,
+  PagedAppSectionState,
   AppSectionSaveState,
 } from 'App/State/AppSectionState';
 import Column from 'Components/Table/Column';
@@ -7,9 +8,11 @@ import { SortDirection } from 'Helpers/Props/sortDirections';
 import Movie from 'Movie/Movie';
 import { Filter, FilterBuilderProp } from './AppState';
 
-export interface MovieIndexAppState {
-  sortKey: string;
-  sortDirection: SortDirection;
+export interface MovieIndexAppState
+  extends AppSectionState<Movie>,
+    AppSectionDeleteState,
+    AppSectionSaveState,
+    PagedAppSectionState {
   secondarySortKey: string;
   secondarySortDirection: SortDirection;
   view: string;
@@ -49,7 +52,7 @@ export interface MovieIndexAppState {
     showSearchAction: boolean;
   };
 
-  selectedFilterKey: string;
+  selectedFilterKey: string | number;
   filterBuilderProps: FilterBuilderProp<Movie>[];
   filters: Filter[];
   columns: Column[];

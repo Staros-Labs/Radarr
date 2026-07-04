@@ -11,6 +11,7 @@ import {
   setMovieCollectionsFilter,
   setMovieCollectionsSort
 } from 'Store/Actions/movieCollectionActions';
+import { fetchMovies } from 'Store/Actions/movieActions';
 import { clearQueueDetails, fetchQueueDetails } from 'Store/Actions/queueActions';
 import scrollPositions from 'Store/scrollPositions';
 import createCollectionClientSideCollectionItemsSelector from 'Store/Selectors/createCollectionClientSideCollectionItemsSelector';
@@ -42,6 +43,9 @@ function createMapDispatchToProps(dispatch, props) {
     dispatchFetchMovieCollections() {
       dispatch(fetchMovieCollections());
     },
+    dispatchFetchMovies() {
+      dispatch(fetchMovies());
+    },
     dispatchFetchQueueDetails() {
       dispatch(fetchQueueDetails());
     },
@@ -72,6 +76,7 @@ class CollectionConnector extends Component {
 
   componentDidMount() {
     this.props.dispatchFetchMovieCollections();
+    this.props.dispatchFetchMovies();
     this.props.dispatchFetchQueueDetails();
   }
 
@@ -117,6 +122,7 @@ CollectionConnector.propTypes = {
   view: PropTypes.string.isRequired,
   onUpdateSelectedPress: PropTypes.func.isRequired,
   dispatchFetchMovieCollections: PropTypes.func.isRequired,
+  dispatchFetchMovies: PropTypes.func.isRequired,
   dispatchFetchQueueDetails: PropTypes.func.isRequired,
   dispatchClearQueueDetails: PropTypes.func.isRequired
 };

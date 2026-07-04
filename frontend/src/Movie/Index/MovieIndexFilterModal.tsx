@@ -3,6 +3,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { createSelector } from 'reselect';
 import AppState from 'App/State/AppState';
 import FilterModal from 'Components/Filter/FilterModal';
+import useEnsureMoviesLoaded from 'Helpers/Hooks/useEnsureMoviesLoaded';
 import { setMovieFilter } from 'Store/Actions/movieIndexActions';
 
 function createMovieSelector() {
@@ -30,6 +31,8 @@ interface MovieIndexFilterModalProps {
 export default function MovieIndexFilterModal(
   props: MovieIndexFilterModalProps
 ) {
+  useEnsureMoviesLoaded(props.isOpen);
+
   const sectionItems = useSelector(createMovieSelector());
   const filterBuilderProps = useSelector(createFilterBuilderPropsSelector());
   const customFilterType = 'movieIndex';

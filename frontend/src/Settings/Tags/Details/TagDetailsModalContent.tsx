@@ -4,6 +4,7 @@ import { createSelector } from 'reselect';
 import ModelBase from 'App/ModelBase';
 import AppState from 'App/State/AppState';
 import FieldSet from 'Components/FieldSet';
+import useEnsureMoviesLoaded from 'Helpers/Hooks/useEnsureMoviesLoaded';
 import Label from 'Components/Label';
 import Button from 'Components/Link/Button';
 import ModalBody from 'Components/Modal/ModalBody';
@@ -84,6 +85,8 @@ function TagDetailsModalContent({
   onModalClose,
   onDeleteTagPress,
 }: TagDetailsModalContentProps) {
+  useEnsureMoviesLoaded();
+
   const movies = useSelector(createMatchingMoviesSelector(movieIds));
 
   const delayProfiles = useSelector(

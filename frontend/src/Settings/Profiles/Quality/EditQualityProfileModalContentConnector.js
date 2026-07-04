@@ -3,6 +3,7 @@ import PropTypes from 'prop-types';
 import React, { Component } from 'react';
 import { connect } from 'react-redux';
 import { createSelector } from 'reselect';
+import { fetchMovies } from 'Store/Actions/movieActions';
 import { fetchQualityProfileSchema, saveQualityProfile, setQualityProfileValue } from 'Store/Actions/settingsActions';
 import createProfileInUseSelector from 'Store/Selectors/createProfileInUseSelector';
 import createProviderSettingsSelector from 'Store/Selectors/createProviderSettingsSelector';
@@ -134,6 +135,7 @@ function createMapStateToProps() {
 }
 
 const mapDispatchToProps = {
+  fetchMovies,
   fetchQualityProfileSchema,
   setQualityProfileValue,
   saveQualityProfile
@@ -156,6 +158,8 @@ class EditQualityProfileModalContentConnector extends Component {
   }
 
   componentDidMount() {
+    this.props.fetchMovies();
+
     if (!this.props.id && !this.props.isPopulated) {
       this.props.fetchQualityProfileSchema();
     }
@@ -516,6 +520,7 @@ EditQualityProfileModalContentConnector.propTypes = {
   item: PropTypes.object.isRequired,
   languages: PropTypes.arrayOf(PropTypes.object).isRequired,
   setQualityProfileValue: PropTypes.func.isRequired,
+  fetchMovies: PropTypes.func.isRequired,
   fetchQualityProfileSchema: PropTypes.func.isRequired,
   saveQualityProfile: PropTypes.func.isRequired,
   onModalClose: PropTypes.func.isRequired

@@ -9,7 +9,7 @@ import createAjaxRequest from 'Utilities/createAjaxRequest';
 import dateFilterPredicate from 'Utilities/Date/dateFilterPredicate';
 import padNumber from 'Utilities/Number/padNumber';
 import translate from 'Utilities/String/translate';
-import { set, updateItem } from './baseActions';
+import { set, update, updateItem } from './baseActions';
 import createFetchHandler from './Creators/createFetchHandler';
 import createHandleActions from './Creators/createHandleActions';
 import createRemoveItemHandler from './Creators/createRemoveItemHandler';
@@ -352,6 +352,7 @@ export const defaultState = {
   isDeleting: false,
   deleteError: null,
   items: [],
+  itemMap: {},
   sortKey: 'sortTitle',
   sortDirection: sortDirections.ASCENDING,
   pendingChanges: {},
@@ -368,6 +369,8 @@ export const persistState = [
 // Actions Types
 
 export const FETCH_MOVIES = 'movies/fetchMovies';
+export const FETCH_MOVIES_BY_IDS = 'movies/fetchMoviesByIds';
+export const FETCH_MOVIE_BY_TITLE_SLUG = 'movies/fetchMovieByTitleSlug';
 export const SET_MOVIE_VALUE = 'movies/setMovieValue';
 export const SAVE_MOVIE = 'movies/saveMovie';
 export const DELETE_MOVIE = 'movies/deleteMovie';
@@ -382,6 +385,8 @@ export const TOGGLE_MOVIE_MONITORED = 'movies/toggleMovieMonitored';
 // Action Creators
 
 export const fetchMovies = createThunk(FETCH_MOVIES);
+export const fetchMoviesByIds = createThunk(FETCH_MOVIES_BY_IDS);
+export const fetchMovieByTitleSlug = createThunk(FETCH_MOVIE_BY_TITLE_SLUG);
 export const saveMovie = createThunk(SAVE_MOVIE, (payload) => {
   const newPayload = {
     ...payload
@@ -432,12 +437,71 @@ function getSaveAjaxOptions({ ajaxOptions, payload }) {
   return ajaxOptions;
 }
 
+export function mergeMovies(existingMovies, incomingMovies) {
+  const movies = [...existingMovies];
+  const movieIndexes = movies.reduce((acc, movie, index) => {
+    acc[movie.id] = index;
+
+    return acc;
+  }, {});
+
+  incomingMovies.forEach((movie) => {
+    const index = movieIndexes[movie.id];
+
+    if (index == null) {
+      movieIndexes[movie.id] = movies.length;
+      movies.push(movie);
+
+      return;
+    }
+
+    movies[index] = movie;
+  });
+
+  return movies;
+}
+
 //
 // Action Handlers
 
 export const actionHandlers = handleThunks({
 
   [FETCH_MOVIES]: createFetchHandler(section, '/movie'),
+
+  [FETCH_MOVIES_BY_IDS]: (getState, payload, dispatch) => {
+    const { request } = createAjaxRequest({
+      url: '/movie',
+      data: payload,
+      traditional: true
+    });
+
+    request.done((data) => {
+      dispatch(update({
+        section,
+        data: mergeMovies(getState().movies.items, data)
+      }));
+    });
+
+    return request;
+  },
+
+  [FETCH_MOVIE_BY_TITLE_SLUG]: (getState, payload, dispatch) => {
+    const { titleSlug } = payload;
+    const { request } = createAjaxRequest({
+      url: `/movie/slug/${titleSlug}`,
+      traditional: true
+    });
+
+    request.done((data) => {
+      dispatch(update({
+        section,
+        data: mergeMovies(getState().movies.items, [data])
+      }));
+    });
+
+    return request;
+  },
+
   [SAVE_MOVIE]: createSaveProviderHandler(section, '/movie', { getAjaxOptions: getSaveAjaxOptions }),
   [DELETE_MOVIE]: (getState, payload, dispatch) => {
     createRemoveItemHandler(section, '/movie')(getState, payload, dispatch);

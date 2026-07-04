@@ -6,10 +6,9 @@ import React, {
   useState,
 } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { useHistory } from 'react-router';
 import { SelectProvider } from 'App/SelectContext';
-import ClientSideCollectionAppState from 'App/State/ClientSideCollectionAppState';
-import MoviesAppState, { MovieIndexAppState } from 'App/State/MoviesAppState';
+import AppState from 'App/State/AppState';
+import { MovieIndexAppState } from 'App/State/MoviesAppState';
 import { RSS_SYNC } from 'Commands/commandNames';
 import Alert from 'Components/Alert';
 import LoadingIndicator from 'Components/Loading/LoadingIndicator';
@@ -21,24 +20,33 @@ import PageToolbarButton from 'Components/Page/Toolbar/PageToolbarButton';
 import PageToolbarSection from 'Components/Page/Toolbar/PageToolbarSection';
 import PageToolbarSeparator from 'Components/Page/Toolbar/PageToolbarSeparator';
 import TableOptionsModalWrapper from 'Components/Table/TableOptions/TableOptionsModalWrapper';
+import TablePager from 'Components/Table/TablePager';
+import usePaging from 'Components/Table/usePaging';
+import useCurrentPage from 'Helpers/Hooks/useCurrentPage';
 import withScrollPosition from 'Components/withScrollPosition';
 import { align, icons, kinds } from 'Helpers/Props';
 import { DESCENDING } from 'Helpers/Props/sortDirections';
 import InteractiveImportModal from 'InteractiveImport/InteractiveImportModal';
 import NoMovie from 'Movie/NoMovie';
 import { executeCommand } from 'Store/Actions/commandActions';
-import { fetchMovies } from 'Store/Actions/movieActions';
 import {
+  fetchMovieIndex,
+  gotoMovieIndexPage,
   setMovieFilter,
   setMovieSort,
   setMovieTableOption,
   setMovieView,
 } from 'Store/Actions/movieIndexActions';
 import { fetchQueueDetails } from 'Store/Actions/queueActions';
-import scrollPositions from 'Store/scrollPositions';
 import createCommandExecutingSelector from 'Store/Selectors/createCommandExecutingSelector';
+import { createCustomFiltersSelector } from 'Store/Selectors/createClientSideCollectionSelector';
 import createDimensionsSelector from 'Store/Selectors/createDimensionsSelector';
-import createMovieClientSideCollectionItemsSelector from 'Store/Selectors/createMovieClientSideCollectionItemsSelector';
+import scrollPositions from 'Store/scrollPositions';
+import selectUniqueIds from 'Utilities/Object/selectUniqueIds';
+import {
+  registerPagePopulator,
+  unregisterPagePopulator,
+} from 'Utilities/pagePopulator';
 import translate from 'Utilities/String/translate';
 import MovieIndexFilterMenu from './Menus/MovieIndexFilterMenu';
 import MovieIndexSortMenu from './Menus/MovieIndexSortMenu';
@@ -77,23 +85,26 @@ interface MovieIndexProps {
 }
 
 const MovieIndex = withScrollPosition((props: MovieIndexProps) => {
-  const history = useHistory();
+  const requestCurrentPage = useCurrentPage();
 
   const {
     isFetching,
     isPopulated,
     error,
-    totalItems,
     items,
     columns,
     selectedFilterKey,
-    filters,
-    customFilters,
     sortKey,
     sortDirection,
     view,
-  }: MoviesAppState & MovieIndexAppState & ClientSideCollectionAppState =
-    useSelector(createMovieClientSideCollectionItemsSelector('movieIndex'));
+    page,
+    totalPages,
+    totalRecords,
+    filters,
+  }: MovieIndexAppState = useSelector(
+    (state: AppState) => state.movieIndex
+  );
+  const customFilters = useSelector(createCustomFiltersSelector('movieIndex'));
 
   const isRssSyncExecuting = useSelector(
     createCommandExecutingSelector(RSS_SYNC)
@@ -108,16 +119,49 @@ const MovieIndex = withScrollPosition((props: MovieIndexProps) => {
     undefined
   );
   const [isSelectMode, setIsSelectMode] = useState(false);
+  const {
+    handleFirstPagePress,
+    handlePreviousPagePress,
+    handleNextPagePress,
+    handleLastPagePress,
+    handlePageSelect,
+  } = usePaging({
+    page,
+    totalPages,
+    gotoPage: gotoMovieIndexPage,
+  });
 
   useEffect(() => {
-    if (history.action === 'PUSH') {
-      dispatch(fetchMovies());
+    if (requestCurrentPage) {
+      dispatch(fetchMovieIndex());
+    } else {
+      dispatch(gotoMovieIndexPage({ page: 1 }));
     }
-  }, [history, dispatch]);
+  }, [dispatch, requestCurrentPage]);
 
   useEffect(() => {
-    dispatch(fetchQueueDetails({ all: true }));
+    const repopulate = () => {
+      dispatch(fetchMovieIndex());
+    };
+
+    registerPagePopulator(repopulate, [
+      'movieUpdated',
+      'movieFileUpdated',
+      'movieFileDeleted',
+    ]);
+
+    return () => {
+      unregisterPagePopulator(repopulate);
+    };
   }, [dispatch]);
+
+  useEffect(() => {
+    const movieIds = selectUniqueIds(items, 'id');
+
+    if (movieIds.length) {
+      dispatch(fetchQueueDetails({ movieIds }));
+    }
+  }, [items, dispatch]);
 
   const onRssSyncPress = useCallback(() => {
     dispatch(
@@ -132,8 +176,12 @@ const MovieIndex = withScrollPosition((props: MovieIndexProps) => {
   }, [isSelectMode, setIsSelectMode]);
 
   const onTableOptionChange = useCallback(
-    (payload: unknown) => {
+    (payload: { pageSize?: number }) => {
       dispatch(setMovieTableOption(payload));
+
+      if (payload.pageSize) {
+        dispatch(gotoMovieIndexPage({ page: 1 }));
+      }
     },
     [dispatch]
   );
@@ -234,7 +282,7 @@ const MovieIndex = withScrollPosition((props: MovieIndexProps) => {
   const ViewComponent = useMemo(() => getViewComponent(view), [view]);
 
   const isLoaded = !!(!error && isPopulated && items.length);
-  const hasNoMovie = !totalItems;
+  const hasNoMovie = !totalRecords;
 
   return (
     <SelectProvider items={items}>
@@ -369,11 +417,25 @@ const MovieIndex = withScrollPosition((props: MovieIndexProps) => {
                 />
 
                 <MovieIndexFooter />
+
+                <TablePager
+                  page={page}
+                  totalPages={totalPages}
+                  totalRecords={totalRecords}
+                  isFetching={isFetching}
+                  onFirstPagePress={handleFirstPagePress}
+                  onPreviousPagePress={handlePreviousPagePress}
+                  onNextPagePress={handleNextPagePress}
+                  onLastPagePress={handleLastPagePress}
+                  onPageSelect={handlePageSelect}
+                />
               </div>
             ) : null}
 
             {!error && isPopulated && !items.length ? (
-              <NoMovie totalItems={totalItems} />
+              <NoMovie
+                totalItems={selectedFilterKey === 'all' ? totalRecords : 1}
+              />
             ) : null}
           </PageContentBody>
 

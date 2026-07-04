@@ -82,7 +82,8 @@ class AddNewMovie extends Component {
     const {
       error,
       items,
-      hasExistingMovies
+      hasExistingMovies,
+      areMoviesPopulated
     } = this.props;
 
     const term = this.state.term;
@@ -188,7 +189,7 @@ class AddNewMovie extends Component {
           }
 
           {
-            !term && !hasExistingMovies ?
+            !term && areMoviesPopulated && !hasExistingMovies ?
               <div className={styles.message}>
                 <div className={styles.noMoviesText}>
                   {translate('HaveNotAddedMovies')}
@@ -220,6 +221,7 @@ AddNewMovie.propTypes = {
   addError: PropTypes.object,
   items: PropTypes.arrayOf(PropTypes.object).isRequired,
   hasExistingMovies: PropTypes.bool.isRequired,
+  areMoviesPopulated: PropTypes.bool.isRequired,
   onMovieLookupChange: PropTypes.func.isRequired,
   onClearMovieLookup: PropTypes.func.isRequired
 };

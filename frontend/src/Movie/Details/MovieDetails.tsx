@@ -77,13 +77,12 @@ import {
   clearReleases,
 } from 'Store/Actions/releaseActions';
 import { fetchImportListSchema } from 'Store/Actions/Settings/importLists';
-import createAllMoviesSelector from 'Store/Selectors/createAllMoviesSelector';
 import createCommandsSelector from 'Store/Selectors/createCommandsSelector';
 import createDimensionsSelector from 'Store/Selectors/createDimensionsSelector';
 import createUISettingsSelector from 'Store/Selectors/createUISettingsSelector';
 import fonts from 'Styles/Variables/fonts';
-import sortByProp from 'Utilities/Array/sortByProp';
 import { findCommand, isCommandExecuting } from 'Utilities/Command';
+import createAjaxRequest from 'Utilities/createAjaxRequest';
 import formatRuntime from 'Utilities/Date/formatRuntime';
 import getPathWithUrlBase from 'Utilities/getPathWithUrlBase';
 import formatBytes from 'Utilities/Number/formatBytes';
@@ -160,7 +159,6 @@ function MovieDetails({ movieId }: MovieDetailsProps) {
   const history = useHistory();
 
   const movie = useMovie(movieId);
-  const allMovies = useSelector(createAllMoviesSelector());
 
   const { isMovieFilesFetching, movieFilesError, hasMovieFiles } = useSelector(
     createMovieFilesSelector()
@@ -225,32 +223,10 @@ function MovieDetails({ movieId }: MovieDetailsProps) {
     };
   }, [movieId, commands]);
 
-  const { nextMovie, previousMovie } = useMemo(() => {
-    const sortedMovies = [...allMovies].sort(sortByProp('sortTitle'));
-    const movieIndex = sortedMovies.findIndex((movie) => movie.id === movieId);
-
-    if (movieIndex === -1) {
-      return {
-        nextMovie: undefined,
-        previousMovie: undefined,
-      };
-    }
-
-    const nextMovie = sortedMovies[movieIndex + 1] ?? sortedMovies[0];
-    const previousMovie =
-      sortedMovies[movieIndex - 1] ?? sortedMovies[sortedMovies.length - 1];
-
-    return {
-      nextMovie: {
-        title: nextMovie.title,
-        titleSlug: nextMovie.titleSlug,
-      },
-      previousMovie: {
-        title: previousMovie.title,
-        titleSlug: previousMovie.titleSlug,
-      },
-    };
-  }, [movieId, allMovies]);
+  const [navigation, setNavigation] = useState<{
+    nextMovie?: { title: string; titleSlug: string };
+    previousMovie?: { title: string; titleSlug: string };
+  }>({});
 
   const touchStart = useRef<number | null>(null);
   const [isOrganizeModalOpen, setIsOrganizeModalOpen] = useState(false);
@@ -264,6 +240,31 @@ function MovieDetails({ movieId }: MovieDetailsProps) {
   const [overviewRef, { height: overviewHeight }] = useMeasure();
   const wasRefreshing = usePrevious(isRefreshing);
   const wasRenaming = usePrevious(isRenaming);
+  const { nextMovie, previousMovie } = navigation;
+
+  useEffect(() => {
+    if (!movie?.titleSlug) {
+      setNavigation({});
+      return;
+    }
+
+    const { request, abortRequest } = createAjaxRequest({
+      url: `/movie/slug/${movie.titleSlug}/navigation`,
+      traditional: true,
+    });
+
+    request.done((data) => {
+      setNavigation(data);
+    });
+
+    request.fail(() => {
+      setNavigation({});
+    });
+
+    return () => {
+      abortRequest();
+    };
+  }, [movie?.titleSlug]);
 
   const handleOrganizePress = useCallback(() => {
     setIsOrganizeModalOpen(true);

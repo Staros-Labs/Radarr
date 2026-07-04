@@ -6,6 +6,7 @@ import AppState from 'App/State/AppState';
 import FormGroup from 'Components/Form/FormGroup';
 import FormInputGroup from 'Components/Form/FormInputGroup';
 import FormLabel from 'Components/Form/FormLabel';
+import useEnsureMoviesLoaded from 'Helpers/Hooks/useEnsureMoviesLoaded';
 import Button from 'Components/Link/Button';
 import ModalBody from 'Components/Modal/ModalBody';
 import ModalContent from 'Components/Modal/ModalContent';
@@ -32,6 +33,7 @@ const selectDeleteOptions = createSelector(
 
 function DeleteMovieModalContent(props: DeleteMovieModalContentProps) {
   const { movieIds, onModalClose } = props;
+  useEnsureMoviesLoaded();
 
   const { addImportExclusion } = useSelector(selectDeleteOptions);
   const allMovies: Movie[] = useSelector(createAllMoviesSelector());
