@@ -1,39 +1,34 @@
 import classNames from 'classnames';
 import React from 'react';
 import { useSelector } from 'react-redux';
-import { createSelector } from 'reselect';
 import { ColorImpairedConsumer } from 'App/ColorImpairedContext';
-import MoviesAppState from 'App/State/MoviesAppState';
+import AppState from 'App/State/AppState';
 import DescriptionList from 'Components/DescriptionList/DescriptionList';
 import DescriptionListItem from 'Components/DescriptionList/DescriptionListItem';
-import createClientSideCollectionSelector from 'Store/Selectors/createClientSideCollectionSelector';
+import Movie from 'Movie/Movie';
 import createDeepEqualSelector from 'Store/Selectors/createDeepEqualSelector';
 import formatBytes from 'Utilities/Number/formatBytes';
 import translate from 'Utilities/String/translate';
 import styles from './MovieIndexFooter.css';
 
-function createUnoptimizedSelector() {
-  return createSelector(
-    createClientSideCollectionSelector('movies', 'movieIndex'),
-    (movies: MoviesAppState) => {
-      return movies.items.map((m) => {
-        const { monitored, status, hasFile, statistics } = m;
-
-        return {
-          monitored,
-          status,
-          hasFile,
-          statistics,
-        };
-      });
-    }
-  );
+interface MovieIndexFooterMovie {
+  hasFile: boolean;
+  monitored: boolean;
+  statistics?: Movie['statistics'];
 }
 
 function createMovieSelector() {
   return createDeepEqualSelector(
-    createUnoptimizedSelector(),
-    (movies) => movies
+    (state: AppState) => state.movieIndex.items,
+    (movies: Movie[]): MovieIndexFooterMovie[] => {
+      return movies.map((movie) => {
+        return {
+          hasFile: movie.hasFile,
+          monitored: movie.monitored,
+          statistics: movie.statistics,
+        };
+      });
+    }
   );
 }
 

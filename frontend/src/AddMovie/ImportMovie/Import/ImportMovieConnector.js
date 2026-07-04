@@ -6,6 +6,7 @@ import { createSelector } from 'reselect';
 import createRouteMatchShape from 'Helpers/Props/Shapes/createRouteMatchShape';
 import { setAddMovieDefault } from 'Store/Actions/addMovieActions';
 import { clearImportMovie, importMovie, setImportMovieValue } from 'Store/Actions/importMovieActions';
+import { fetchMovies } from 'Store/Actions/movieActions';
 import { fetchRootFolders } from 'Store/Actions/rootFolderActions';
 import ImportMovie from './ImportMovie';
 
@@ -60,6 +61,7 @@ const mapDispatchToProps = {
   dispatchSetImportMovieValue: setImportMovieValue,
   dispatchImportMovie: importMovie,
   dispatchClearImportMovie: clearImportMovie,
+  dispatchFetchMovies: fetchMovies,
   dispatchFetchRootFolders: fetchRootFolders,
   dispatchSetAddMovieDefault: setAddMovieDefault
 };
@@ -74,10 +76,12 @@ class ImportMovieConnector extends Component {
       rootFolderId,
       qualityProfiles,
       defaultQualityProfileId,
+      dispatchFetchMovies,
       dispatchFetchRootFolders,
       dispatchSetAddMovieDefault
     } = this.props;
 
+    dispatchFetchMovies();
     dispatchFetchRootFolders({ id: rootFolderId, timeout: false });
 
     let setDefaults = false;
@@ -146,6 +150,7 @@ ImportMovieConnector.propTypes = {
   dispatchSetImportMovieValue: PropTypes.func.isRequired,
   dispatchImportMovie: PropTypes.func.isRequired,
   dispatchClearImportMovie: PropTypes.func.isRequired,
+  dispatchFetchMovies: PropTypes.func.isRequired,
   dispatchFetchRootFolders: PropTypes.func.isRequired,
   dispatchSetAddMovieDefault: PropTypes.func.isRequired
 };

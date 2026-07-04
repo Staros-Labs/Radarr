@@ -9,6 +9,7 @@ import ModalBody from 'Components/Modal/ModalBody';
 import ModalContent from 'Components/Modal/ModalContent';
 import ModalFooter from 'Components/Modal/ModalFooter';
 import ModalHeader from 'Components/Modal/ModalHeader';
+import useEnsureMoviesLoaded from 'Helpers/Hooks/useEnsureMoviesLoaded';
 import { icons, kinds } from 'Helpers/Props';
 import Movie from 'Movie/Movie';
 import { executeCommand } from 'Store/Actions/commandActions';
@@ -23,6 +24,7 @@ interface OrganizeMoviesModalContentProps {
 
 function OrganizeMoviesModalContent(props: OrganizeMoviesModalContentProps) {
   const { movieIds, onModalClose } = props;
+  useEnsureMoviesLoaded();
 
   const allMovies: Movie[] = useSelector(createAllMoviesSelector());
   const dispatch = useDispatch();

@@ -1,12 +1,21 @@
 import { createAction } from 'redux-actions';
+import { batchActions } from 'redux-batched-actions';
 import { filterBuilderTypes, filterBuilderValueTypes, sortDirections } from 'Helpers/Props';
+import { createThunk, handleThunks } from 'Store/thunks';
 import sortByProp from 'Utilities/Array/sortByProp';
+import createAjaxRequest from 'Utilities/createAjaxRequest';
+import serverSideCollectionHandlers from 'Utilities/serverSideCollectionHandlers';
 import translate from 'Utilities/String/translate';
+import { set, update, updateServerSideCollection } from './baseActions';
 import createHandleActions from './Creators/createHandleActions';
-import createSetClientSideCollectionFilterReducer from './Creators/Reducers/createSetClientSideCollectionFilterReducer';
-import createSetClientSideCollectionSortReducer from './Creators/Reducers/createSetClientSideCollectionSortReducer';
+import createServerSideCollectionHandlers from './Creators/createServerSideCollectionHandlers';
 import createSetTableOptionReducer from './Creators/Reducers/createSetTableOptionReducer';
-import { filterPredicates, filters, sortPredicates } from './movieActions';
+import {
+  filterPredicates,
+  filters,
+  mergeMovies,
+  sortPredicates
+} from './movieActions';
 
 //
 // Variables
@@ -17,6 +26,14 @@ export const section = 'movieIndex';
 // State
 
 export const defaultState = {
+  isFetching: false,
+  isPopulated: false,
+  error: null,
+  page: 1,
+  pageSize: 20,
+  totalPages: 1,
+  totalRecords: 0,
+  items: [],
   isSaving: false,
   saveError: null,
   isDeleting: false,
@@ -584,10 +601,10 @@ export const defaultState = {
 };
 
 export const persistState = [
+  'movieIndex.pageSize',
   'movieIndex.sortKey',
   'movieIndex.sortDirection',
   'movieIndex.selectedFilterKey',
-  'movieIndex.customFilters',
   'movieIndex.view',
   'movieIndex.columns',
   'movieIndex.posterOptions',
@@ -598,30 +615,140 @@ export const persistState = [
 //
 // Actions Types
 
+export const FETCH_MOVIE_INDEX = 'movieIndex/fetchMovieIndex';
+export const GOTO_FIRST_MOVIE_INDEX_PAGE = 'movieIndex/gotoMovieIndexFirstPage';
+export const GOTO_PREVIOUS_MOVIE_INDEX_PAGE =
+  'movieIndex/gotoMovieIndexPreviousPage';
+export const GOTO_NEXT_MOVIE_INDEX_PAGE = 'movieIndex/gotoMovieIndexNextPage';
+export const GOTO_LAST_MOVIE_INDEX_PAGE = 'movieIndex/gotoMovieIndexLastPage';
+export const GOTO_MOVIE_INDEX_PAGE = 'movieIndex/gotoMovieIndexPage';
 export const SET_MOVIE_SORT = 'movieIndex/setMovieSort';
 export const SET_MOVIE_FILTER = 'movieIndex/setMovieFilter';
 export const SET_MOVIE_VIEW = 'movieIndex/setMovieView';
 export const SET_MOVIE_TABLE_OPTION = 'movieIndex/setMovieTableOption';
 export const SET_MOVIE_POSTER_OPTION = 'movieIndex/setMoviePosterOption';
 export const SET_MOVIE_OVERVIEW_OPTION = 'movieIndex/setMovieOverviewOption';
+export const FETCH_MOVIE_INDEX_IDS = 'movieIndex/fetchMovieIndexIds';
 
 //
 // Action Creators
 
-export const setMovieSort = createAction(SET_MOVIE_SORT);
-export const setMovieFilter = createAction(SET_MOVIE_FILTER);
+export const fetchMovieIndex = createThunk(FETCH_MOVIE_INDEX);
+export const gotoMovieIndexFirstPage = createThunk(GOTO_FIRST_MOVIE_INDEX_PAGE);
+export const gotoMovieIndexPreviousPage = createThunk(
+  GOTO_PREVIOUS_MOVIE_INDEX_PAGE
+);
+export const gotoMovieIndexNextPage = createThunk(GOTO_NEXT_MOVIE_INDEX_PAGE);
+export const gotoMovieIndexLastPage = createThunk(GOTO_LAST_MOVIE_INDEX_PAGE);
+export const gotoMovieIndexPage = createThunk(GOTO_MOVIE_INDEX_PAGE);
+export const setMovieSort = createThunk(SET_MOVIE_SORT);
+export const setMovieFilter = createThunk(SET_MOVIE_FILTER);
 export const setMovieView = createAction(SET_MOVIE_VIEW);
 export const setMovieTableOption = createAction(SET_MOVIE_TABLE_OPTION);
 export const setMoviePosterOption = createAction(SET_MOVIE_POSTER_OPTION);
 export const setMovieOverviewOption = createAction(SET_MOVIE_OVERVIEW_OPTION);
+export const fetchMovieIndexIds = createThunk(FETCH_MOVIE_INDEX_IDS);
+
+function augmentFetchData(getState, payload, data) {
+  const movieIndex = getState().movieIndex;
+  const selectedFilterKey =
+    payload?.selectedFilterKey ?? movieIndex.selectedFilterKey;
+
+  delete data.selectedFilterKey;
+
+  if (typeof selectedFilterKey === 'number') {
+    data.customFilterId = selectedFilterKey;
+  } else {
+    data.filterKey = selectedFilterKey;
+  }
+}
 
 //
 // Reducers
 
-export const reducers = createHandleActions({
+handleThunks({
+  ...createServerSideCollectionHandlers(
+    section,
+    '/movie/paged',
+    fetchMovieIndex,
+    {
+      [serverSideCollectionHandlers.FETCH]: FETCH_MOVIE_INDEX,
+      [serverSideCollectionHandlers.FIRST_PAGE]: GOTO_FIRST_MOVIE_INDEX_PAGE,
+      [serverSideCollectionHandlers.PREVIOUS_PAGE]:
+        GOTO_PREVIOUS_MOVIE_INDEX_PAGE,
+      [serverSideCollectionHandlers.NEXT_PAGE]: GOTO_NEXT_MOVIE_INDEX_PAGE,
+      [serverSideCollectionHandlers.LAST_PAGE]: GOTO_LAST_MOVIE_INDEX_PAGE,
+      [serverSideCollectionHandlers.EXACT_PAGE]: GOTO_MOVIE_INDEX_PAGE,
+      [serverSideCollectionHandlers.SORT]: SET_MOVIE_SORT,
+      [serverSideCollectionHandlers.FILTER]: SET_MOVIE_FILTER
+    },
+    augmentFetchData
+  ),
 
-  [SET_MOVIE_SORT]: createSetClientSideCollectionSortReducer(section),
-  [SET_MOVIE_FILTER]: createSetClientSideCollectionFilterReducer(section),
+  [FETCH_MOVIE_INDEX]: (getState, payload, dispatch) => {
+    dispatch(set({ section, isFetching: true }));
+
+    const movieIndex = getState().movieIndex;
+    const data = {
+      page: payload.page || movieIndex.page || 1,
+      pageSize: movieIndex.pageSize,
+      sortKey: movieIndex.sortKey,
+      sortDirection: movieIndex.sortDirection
+    };
+
+    augmentFetchData(getState, payload, data);
+
+    const promise = createAjaxRequest({
+      url: '/movie/paged',
+      data,
+      traditional: true
+    }).request;
+
+    promise.done((response) => {
+      const nextMovies = mergeMovies(getState().movies.items, response.records);
+
+      dispatch(batchActions([
+        updateServerSideCollection({ section, data: response }),
+        update({ section: 'movies', data: nextMovies }),
+        set({
+          section,
+          isFetching: false,
+          isPopulated: true,
+          error: null
+        })
+      ]));
+    });
+
+    promise.fail((xhr) => {
+      dispatch(set({
+        section,
+        isFetching: false,
+        isPopulated: false,
+        error: xhr
+      }));
+    });
+
+    return promise;
+  },
+
+  [FETCH_MOVIE_INDEX_IDS]: (getState, payload) => {
+    const movieIndex = getState().movieIndex;
+    const data = {
+      sortKey: payload?.sortKey ?? movieIndex.sortKey,
+      sortDirection: payload?.sortDirection ?? movieIndex.sortDirection
+    };
+
+    augmentFetchData(getState, payload, data);
+
+    return createAjaxRequest({
+      url: '/movie/ids',
+      data,
+      traditional: true
+    }).request;
+  }
+});
+
+export const reducers = createHandleActions({
 
   [SET_MOVIE_VIEW]: function(state, { payload }) {
     return Object.assign({}, state, { view: payload.view });

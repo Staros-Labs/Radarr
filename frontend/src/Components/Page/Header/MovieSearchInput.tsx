@@ -11,18 +11,15 @@ import React, {
   useState,
 } from 'react';
 import Autosuggest from 'react-autosuggest';
-import { useDispatch, useSelector } from 'react-redux';
-import { createSelector } from 'reselect';
+import { useDispatch } from 'react-redux';
 import { useDebouncedCallback } from 'use-debounce';
 import { Tag } from 'App/State/TagsAppState';
 import Icon from 'Components/Icon';
 import LoadingIndicator from 'Components/Loading/LoadingIndicator';
 import useKeyboardShortcuts from 'Helpers/Hooks/useKeyboardShortcuts';
 import { icons } from 'Helpers/Props';
-import Movie from 'Movie/Movie';
-import createAllMoviesSelector from 'Store/Selectors/createAllMoviesSelector';
-import createDeepEqualSelector from 'Store/Selectors/createDeepEqualSelector';
-import createTagsSelector from 'Store/Selectors/createTagsSelector';
+import { Image } from 'Movie/Movie';
+import createAjaxRequest from 'Utilities/createAjaxRequest';
 import translate from 'Utilities/String/translate';
 import MovieSearchResult from './MovieSearchResult';
 import styles from './MovieSearchInput.css';
@@ -39,20 +36,21 @@ interface AddNewMovieSuggestion {
   title: string;
 }
 
-export interface SuggestedMovie
-  extends Pick<
-    Movie,
-    | 'title'
-    | 'year'
-    | 'titleSlug'
-    | 'sortTitle'
-    | 'images'
-    | 'alternateTitles'
-    | 'tmdbId'
-    | 'imdbId'
-  > {
-  firstCharacter: string;
+export interface SuggestedMovie {
+  title: string;
+  year: number;
+  titleSlug: string;
+  sortTitle: string;
+  images: Image[];
+  alternateTitles: Array<{ title: string }>;
+  tmdbId: number;
+  imdbId: string;
   tags: Tag[];
+}
+
+interface MovieSearchResponseItem extends SuggestedMovie {
+  matchedKey: string;
+  matchedIndex: number;
 }
 
 interface MovieSuggestion {
@@ -69,78 +67,26 @@ interface Section {
   suggestions: MovieSuggestion[] | AddNewMovieSuggestion[];
 }
 
-function createUnoptimizedSelector() {
-  return createSelector(
-    createAllMoviesSelector(),
-    createTagsSelector(),
-    (allMovies, allTags) => {
-      return allMovies.map((movie): SuggestedMovie => {
-        const {
-          title,
-          year,
-          titleSlug,
-          sortTitle,
-          images,
-          alternateTitles = [],
-          tmdbId,
-          imdbId,
-          tags = [],
-        } = movie;
-
-        return {
-          title,
-          year,
-          titleSlug,
-          sortTitle,
-          images,
-          alternateTitles,
-          tmdbId,
-          imdbId,
-          firstCharacter: title.charAt(0).toLowerCase(),
-          tags: tags.reduce<Tag[]>((acc, id) => {
-            const matchingTag = allTags.find((tag) => tag.id === id);
-
-            if (matchingTag) {
-              acc.push(matchingTag);
-            }
-
-            return acc;
-          }, []),
-        };
-      });
-    }
-  );
-}
-
-function createMoviesSelector() {
-  return createDeepEqualSelector(
-    createUnoptimizedSelector(),
-    (movies) => movies
-  );
-}
-
 function MovieSearchInput() {
-  const movies = useSelector(createMoviesSelector());
   const dispatch = useDispatch();
   const { bindShortcut, unbindShortcut } = useKeyboardShortcuts();
 
   const [value, setValue] = useState('');
-  const [requestLoading, setRequestLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [suggestions, setSuggestions] = useState<MovieSuggestion[]>([]);
 
   const autosuggestRef = useRef<Autosuggest>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const worker = useRef<Worker | null>(null);
-  const isLoading = useRef(false);
-  const requestValue = useRef<string | null>(null);
+  const latestQueryRef = useRef('');
+  const abortRequestRef = useRef<(() => void) | null>(null);
 
   const suggestionGroups = useMemo(() => {
     const result: Section[] = [];
 
-    if (suggestions.length || isLoading.current) {
+    if (suggestions.length || isLoading) {
       result.push({
         title: translate('ExistingMovies'),
-        loading: isLoading.current,
+        loading: isLoading,
         suggestions,
       });
     }
@@ -156,59 +102,73 @@ function MovieSearchInput() {
     });
 
     return result;
-  }, [suggestions, value]);
+  }, [isLoading, suggestions, value]);
 
-  const handleSuggestionsReceived = useCallback(
-    (message: { data: { value: string; suggestions: MovieSuggestion[] } }) => {
-      const { value, suggestions } = message.data;
+  const requestSuggestions = useDebouncedCallback((query: string) => {
+    const trimmed = query.trim();
 
-      if (!isLoading.current) {
-        requestValue.current = null;
-        setRequestLoading(false);
-      } else if (value === requestValue.current) {
-        setSuggestions(suggestions);
-        requestValue.current = null;
-        setRequestLoading(false);
-        isLoading.current = false;
-        // setLoading(false);
-      } else {
-        setSuggestions(suggestions);
-        setRequestLoading(true);
+    abortRequestRef.current?.();
 
-        const payload = {
-          value: requestValue,
-          movies,
-        };
-
-        worker.current?.postMessage(payload);
-      }
-    },
-    [movies]
-  );
-
-  const requestSuggestions = useDebouncedCallback((value: string) => {
-    if (!isLoading.current) {
+    if (!trimmed) {
+      setIsLoading(false);
+      setSuggestions([]);
+      latestQueryRef.current = '';
       return;
     }
 
-    requestValue.current = value;
-    setRequestLoading(true);
+    latestQueryRef.current = trimmed;
+    setIsLoading(true);
 
-    if (!requestLoading) {
-      const payload = {
-        value,
-        movies,
-      };
+    const { request, abortRequest } = createAjaxRequest({
+      url: '/movie/search',
+      data: {
+        term: trimmed,
+      },
+      traditional: true,
+    });
 
-      worker.current?.postMessage(payload);
-    }
+    abortRequestRef.current = abortRequest;
+
+    request.done((data: MovieSearchResponseItem[]) => {
+      if (latestQueryRef.current !== trimmed) {
+        return;
+      }
+
+      const nextSuggestions: MovieSuggestion[] = data.map((item) => {
+        return {
+          title: item.title,
+          indices: [],
+          item,
+          matches: [
+            {
+              key: item.matchedKey,
+              refIndex: item.matchedIndex,
+            },
+          ],
+          refIndex: item.matchedIndex,
+        };
+      });
+
+      setSuggestions(nextSuggestions);
+      setIsLoading(false);
+    });
+
+    request.fail(() => {
+      if (latestQueryRef.current !== trimmed) {
+        return;
+      }
+
+      setSuggestions([]);
+      setIsLoading(false);
+    });
   }, 250);
 
   const reset = useCallback(() => {
+    abortRequestRef.current?.();
+    latestQueryRef.current = '';
     setValue('');
     setSuggestions([]);
-    // setLoading(false);
-    isLoading.current = false;
+    setIsLoading(false);
   }, []);
 
   const focusInput = useCallback((event: ExtendedKeyboardEvent) => {
@@ -225,13 +185,13 @@ function MovieSearchInput() {
       <div className={styles.sectionTitle}>
         {section.title}
 
-        {section.loading && (
+        {section.loading ? (
           <LoadingIndicator
             className={styles.loading}
             rippleClassName={styles.ripple}
             size={20}
           />
-        )}
+        ) : null}
       </div>
     );
   }, []);
@@ -313,9 +273,6 @@ function MovieSearchInput() {
         return;
       }
 
-      // If a suggestion is not selected go to the first movie,
-      // otherwise go to the selected movie.
-
       const selectedSuggestion =
         highlightedSuggestionIndex == null
           ? suggestions[0]
@@ -330,7 +287,7 @@ function MovieSearchInput() {
       inputRef.current?.blur();
       reset();
     },
-    [value, suggestions, dispatch, reset]
+    [dispatch, reset, suggestions, value]
   );
 
   const handleBlur = useCallback(() => {
@@ -339,16 +296,16 @@ function MovieSearchInput() {
 
   const handleSuggestionsFetchRequested = useCallback(
     ({ value }: { value: string }) => {
-      isLoading.current = true;
-
       requestSuggestions(value);
     },
     [requestSuggestions]
   );
 
   const handleSuggestionsClearRequested = useCallback(() => {
+    abortRequestRef.current?.();
+    latestQueryRef.current = '';
     setSuggestions([]);
-    isLoading.current = false;
+    setIsLoading(false);
   }, []);
 
   const handleSuggestionSelected = useCallback(
@@ -369,7 +326,7 @@ function MovieSearchInput() {
         );
       }
     },
-    [value, dispatch]
+    [dispatch, value]
   );
 
   const inputProps = {
@@ -395,41 +352,14 @@ function MovieSearchInput() {
   };
 
   useEffect(() => {
-    worker.current = new Worker(new URL('./fuse.worker.ts', import.meta.url));
-
-    return () => {
-      if (worker.current) {
-        worker.current.terminate();
-        worker.current = null;
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-    worker.current?.addEventListener(
-      'message',
-      handleSuggestionsReceived,
-      false
-    );
-
-    return () => {
-      if (worker.current) {
-        worker.current.removeEventListener(
-          'message',
-          handleSuggestionsReceived,
-          false
-        );
-      }
-    };
-  }, [handleSuggestionsReceived]);
-
-  useEffect(() => {
     bindShortcut('focusMovieSearchInput', focusInput);
 
     return () => {
+      requestSuggestions.cancel();
+      abortRequestRef.current?.();
       unbindShortcut('focusMovieSearchInput');
     };
-  }, [bindShortcut, unbindShortcut, focusInput]);
+  }, [bindShortcut, focusInput, requestSuggestions, unbindShortcut]);
 
   return (
     <div className={styles.wrapper}>

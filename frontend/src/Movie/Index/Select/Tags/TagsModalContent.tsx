@@ -12,6 +12,7 @@ import ModalBody from 'Components/Modal/ModalBody';
 import ModalContent from 'Components/Modal/ModalContent';
 import ModalFooter from 'Components/Modal/ModalFooter';
 import ModalHeader from 'Components/Modal/ModalHeader';
+import useEnsureMoviesLoaded from 'Helpers/Hooks/useEnsureMoviesLoaded';
 import { inputTypes, kinds, sizes } from 'Helpers/Props';
 import Movie from 'Movie/Movie';
 import createAllMoviesSelector from 'Store/Selectors/createAllMoviesSelector';
@@ -27,6 +28,7 @@ interface TagsModalContentProps {
 
 function TagsModalContent(props: TagsModalContentProps) {
   const { movieIds, onModalClose, onApplyTagsPress } = props;
+  useEnsureMoviesLoaded();
 
   const allMovies: Movie[] = useSelector(createAllMoviesSelector());
   const tagList: Tag[] = useSelector(createTagsSelector());

@@ -17,6 +17,7 @@ import ModalHeader from 'Components/Modal/ModalHeader';
 import Scroller from 'Components/Scroller/Scroller';
 import Column from 'Components/Table/Column';
 import VirtualTableRowButton from 'Components/Table/VirtualTableRowButton';
+import useEnsureMoviesLoaded from 'Helpers/Hooks/useEnsureMoviesLoaded';
 import { scrollDirections } from 'Helpers/Props';
 import Movie from 'Movie/Movie';
 import createAllMoviesSelector from 'Store/Selectors/createAllMoviesSelector';
@@ -101,6 +102,7 @@ function Row({ index, style, data }: ListChildComponentProps<RowItemData>) {
 
 function SelectMovieModalContent(props: SelectMovieModalContentProps) {
   const { modalTitle, onMovieSelect, onModalClose } = props;
+  useEnsureMoviesLoaded();
 
   const listRef = useRef<List<RowItemData>>(null);
   const scrollerRef = useRef<HTMLDivElement>(null);

@@ -47,6 +47,7 @@ namespace Radarr.Api.V3.Movies
         private readonly IRootFolderService _rootFolderService;
         private readonly IUpgradableSpecification _qualityUpgradableSpecification;
         private readonly IConfigService _configService;
+        private readonly IMovieIndexQueryService _movieIndexQueryService;
 
         public MovieController(IBroadcastSignalRMessage signalRBroadcaster,
                            IMovieService moviesService,
@@ -57,6 +58,7 @@ namespace Radarr.Api.V3.Movies
                            IManageCommandQueue commandQueueManager,
                            IRootFolderService rootFolderService,
                            IUpgradableSpecification qualityUpgradableSpecification,
+                           IMovieIndexQueryService movieIndexQueryService,
                            IConfigService configService,
                            RootFolderValidator rootFolderValidator,
                            MappedNetworkDriveValidator mappedNetworkDriveValidator,
@@ -79,6 +81,7 @@ namespace Radarr.Api.V3.Movies
             _coverMapper = coverMapper;
             _commandQueueManager = commandQueueManager;
             _rootFolderService = rootFolderService;
+            _movieIndexQueryService = movieIndexQueryService;
 
             SharedValidator.RuleFor(s => s.Path).Cascade(CascadeMode.Stop)
                 .IsValidPath()
@@ -114,7 +117,7 @@ namespace Radarr.Api.V3.Movies
         }
 
         [HttpGet]
-        public List<MovieResource> AllMovie(int? tmdbId, bool excludeLocalCovers = false, int? languageId = null)
+        public List<MovieResource> AllMovie(int? tmdbId, [FromQuery(Name = "movieIds")] List<int> movieIds = null, bool excludeLocalCovers = false, int? languageId = null)
         {
             var moviesResources = new List<MovieResource>();
 
@@ -129,6 +132,37 @@ namespace Radarr.Api.V3.Movies
                 if (movie != null)
                 {
                     moviesResources.AddIfNotNull(MapToResource(movie, translationLanguage));
+                }
+            }
+            else if (movieIds is { Count: > 0 })
+            {
+                var availDelay = _configService.AvailabilityDelay;
+                var translations = _movieTranslationService
+                    .GetAllTranslationsForLanguage(translationLanguage)
+                    .ToDictionaryIgnoreDuplicates((translation) => translation.MovieMetadataId);
+                var stats = _movieStatisticsService.MovieStatistics().ToDictionary((movieStat) => movieStat.MovieId);
+                var rootFolders = _rootFolderService.All();
+                var movies = _moviesService.GetMovies(movieIds)
+                    .OrderBy((movie) => movieIds.IndexOf(movie.Id))
+                    .ToList();
+
+                foreach (var movie in movies)
+                {
+                    translations.TryGetValue(movie.MovieMetadataId, out var translation);
+                    var resource = movie.ToResource(availDelay, translation, _qualityUpgradableSpecification);
+
+                    if (!excludeLocalCovers)
+                    {
+                        MapCoversToLocal(resource);
+                    }
+
+                    if (stats.TryGetValue(movie.Id, out var movieStatistics))
+                    {
+                        LinkMovieStatistics(resource, movieStatistics);
+                    }
+
+                    resource.RootFolderPath = _rootFolderService.GetBestRootFolderPath(resource.Path, rootFolders);
+                    moviesResources.Add(resource);
                 }
             }
             else
@@ -169,6 +203,55 @@ namespace Radarr.Api.V3.Movies
             }
 
             return moviesResources;
+        }
+
+        [HttpGet("paged")]
+        [Produces("application/json")]
+        public PagingResource<MovieResource> GetPagedMovies([FromQuery] MovieIndexPagingRequestResource paging)
+        {
+            return _movieIndexQueryService.GetPaged(paging);
+        }
+
+        [HttpGet("ids")]
+        [Produces("application/json")]
+        public List<int> GetMovieIds([FromQuery] MovieIndexPagingRequestResource paging)
+        {
+            return _movieIndexQueryService.GetMovieIds(paging);
+        }
+
+        [HttpGet("search")]
+        [Produces("application/json")]
+        public List<MovieSearchResultResource> SearchMovies([FromQuery] string term, [FromQuery] int limit = 20)
+        {
+            return _movieIndexQueryService.Search(term, limit);
+        }
+
+        [HttpGet("slug/{titleSlug}")]
+        [Produces("application/json")]
+        public ActionResult<MovieResource> GetMovieByTitleSlug(string titleSlug)
+        {
+            var resource = _movieIndexQueryService.GetMovieByTitleSlug(titleSlug);
+
+            if (resource == null)
+            {
+                return NotFound();
+            }
+
+            return resource;
+        }
+
+        [HttpGet("slug/{titleSlug}/navigation")]
+        [Produces("application/json")]
+        public ActionResult<MovieNavigationResource> GetMovieNavigation(string titleSlug)
+        {
+            var resource = _movieIndexQueryService.GetNavigation(titleSlug);
+
+            if (resource == null)
+            {
+                return NotFound();
+            }
+
+            return resource;
         }
 
         protected override MovieResource GetResourceById(int id)

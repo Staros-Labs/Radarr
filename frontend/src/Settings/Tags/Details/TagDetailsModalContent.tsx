@@ -10,6 +10,7 @@ import ModalBody from 'Components/Modal/ModalBody';
 import ModalContent from 'Components/Modal/ModalContent';
 import ModalFooter from 'Components/Modal/ModalFooter';
 import ModalHeader from 'Components/Modal/ModalHeader';
+import useEnsureMoviesLoaded from 'Helpers/Hooks/useEnsureMoviesLoaded';
 import { kinds } from 'Helpers/Props';
 import createAllMoviesSelector from 'Store/Selectors/createAllMoviesSelector';
 import translate from 'Utilities/String/translate';
@@ -84,6 +85,8 @@ function TagDetailsModalContent({
   onModalClose,
   onDeleteTagPress,
 }: TagDetailsModalContentProps) {
+  useEnsureMoviesLoaded();
+
   const movies = useSelector(createMatchingMoviesSelector(movieIds));
 
   const delayProfiles = useSelector(

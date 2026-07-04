@@ -1,32 +1,31 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
+import { useDispatch, useSelector, useStore } from 'react-redux';
 import { useSelect } from 'App/SelectContext';
-import ClientSideCollectionAppState from 'App/State/ClientSideCollectionAppState';
-import MoviesAppState, { MovieIndexAppState } from 'App/State/MoviesAppState';
+import AppState from 'App/State/AppState';
 import { MOVIE_SEARCH } from 'Commands/commandNames';
 import ConfirmModal from 'Components/Modal/ConfirmModal';
 import PageToolbarButton from 'Components/Page/Toolbar/PageToolbarButton';
 import { icons, kinds } from 'Helpers/Props';
 import { executeCommand } from 'Store/Actions/commandActions';
+import { fetchMovieIndexIds } from 'Store/Actions/movieIndexActions';
 import createCommandExecutingSelector from 'Store/Selectors/createCommandExecutingSelector';
-import createMovieClientSideCollectionItemsSelector from 'Store/Selectors/createMovieClientSideCollectionItemsSelector';
+import { executeThunk } from 'Store/thunks';
 import translate from 'Utilities/String/translate';
 import getSelectedIds from 'Utilities/Table/getSelectedIds';
 
 interface MovieIndexSearchButtonProps {
   isSelectMode: boolean;
-  selectedFilterKey: string;
+  selectedFilterKey: string | number;
   overflowComponent: React.FunctionComponent<never>;
 }
 
 function MovieIndexSearchButton(props: MovieIndexSearchButtonProps) {
   const isSearching = useSelector(createCommandExecutingSelector(MOVIE_SEARCH));
-  const {
-    items,
-  }: MoviesAppState & MovieIndexAppState & ClientSideCollectionAppState =
-    useSelector(createMovieClientSideCollectionItemsSelector('movieIndex'));
+  const totalRecords =
+    useSelector((state: AppState) => state.movieIndex.totalRecords) ?? 0;
 
   const dispatch = useDispatch();
+  const store = useStore<AppState>();
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
 
   const { isSelectMode, selectedFilterKey } = props;
@@ -37,10 +36,10 @@ function MovieIndexSearchButton(props: MovieIndexSearchButtonProps) {
     return getSelectedIds(selectedState);
   }, [selectedState]);
 
-  const moviesToSearch =
+  const searchCount =
     isSelectMode && selectedMovieIds.length > 0
-      ? selectedMovieIds
-      : items.map((m) => m.id);
+      ? selectedMovieIds.length
+      : totalRecords;
 
   const searchIndexLabel =
     selectedFilterKey === 'all'
@@ -55,30 +54,52 @@ function MovieIndexSearchButton(props: MovieIndexSearchButtonProps) {
   const onPress = useCallback(() => {
     setIsConfirmModalOpen(false);
 
-    dispatch(
-      executeCommand({
-        name: MOVIE_SEARCH,
-        movieIds: moviesToSearch,
-      })
-    );
-  }, [dispatch, moviesToSearch]);
+    const request =
+      isSelectMode && selectedMovieIds.length > 0
+        ? null
+        : executeThunk<number[]>(
+            fetchMovieIndexIds(),
+            dispatch,
+            store.getState
+          );
+
+    if (!request) {
+      dispatch(
+        executeCommand({
+          name: MOVIE_SEARCH,
+          movieIds: selectedMovieIds,
+        })
+      );
+
+      return;
+    }
+
+    request.done((movieIds: number[]) => {
+      dispatch(
+        executeCommand({
+          name: MOVIE_SEARCH,
+          movieIds,
+        })
+      );
+    });
+  }, [dispatch, isSelectMode, selectedMovieIds, store]);
 
   const onConfirmPress = useCallback(() => {
     setIsConfirmModalOpen(true);
-  }, [setIsConfirmModalOpen]);
+  }, []);
 
   const onConfirmModalClose = useCallback(() => {
     setIsConfirmModalOpen(false);
-  }, [setIsConfirmModalOpen]);
+  }, []);
 
   return (
     <>
       <PageToolbarButton
         label={isSelectMode ? searchSelectLabel : searchIndexLabel}
         isSpinning={isSearching}
-        isDisabled={!items.length}
+        isDisabled={!searchCount}
         iconName={icons.SEARCH}
-        onPress={moviesToSearch.length > 5 ? onConfirmPress : onPress}
+        onPress={searchCount > 5 ? onConfirmPress : onPress}
       />
 
       <ConfirmModal
@@ -86,7 +107,7 @@ function MovieIndexSearchButton(props: MovieIndexSearchButtonProps) {
         kind={kinds.DANGER}
         title={isSelectMode ? searchSelectLabel : searchIndexLabel}
         message={translate('SearchMoviesConfirmationMessageText', {
-          count: moviesToSearch.length,
+          count: searchCount,
         })}
         confirmLabel={isSelectMode ? searchSelectLabel : searchIndexLabel}
         onConfirm={onPress}

@@ -5,6 +5,7 @@ import { createSelector } from 'reselect';
 import * as commandNames from 'Commands/commandNames';
 import withScrollPosition from 'Components/withScrollPosition';
 import { executeCommand } from 'Store/Actions/commandActions';
+import { fetchMovies } from 'Store/Actions/movieActions';
 import {
   fetchMovieCollections,
   saveMovieCollections,
@@ -42,6 +43,9 @@ function createMapDispatchToProps(dispatch, props) {
     dispatchFetchMovieCollections() {
       dispatch(fetchMovieCollections());
     },
+    dispatchFetchMovies() {
+      dispatch(fetchMovies());
+    },
     dispatchFetchQueueDetails() {
       dispatch(fetchQueueDetails());
     },
@@ -72,6 +76,7 @@ class CollectionConnector extends Component {
 
   componentDidMount() {
     this.props.dispatchFetchMovieCollections();
+    this.props.dispatchFetchMovies();
     this.props.dispatchFetchQueueDetails();
   }
 
@@ -117,6 +122,7 @@ CollectionConnector.propTypes = {
   view: PropTypes.string.isRequired,
   onUpdateSelectedPress: PropTypes.func.isRequired,
   dispatchFetchMovieCollections: PropTypes.func.isRequired,
+  dispatchFetchMovies: PropTypes.func.isRequired,
   dispatchFetchQueueDetails: PropTypes.func.isRequired,
   dispatchClearQueueDetails: PropTypes.func.isRequired
 };

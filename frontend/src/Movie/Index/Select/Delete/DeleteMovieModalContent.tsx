@@ -11,6 +11,7 @@ import ModalBody from 'Components/Modal/ModalBody';
 import ModalContent from 'Components/Modal/ModalContent';
 import ModalFooter from 'Components/Modal/ModalFooter';
 import ModalHeader from 'Components/Modal/ModalHeader';
+import useEnsureMoviesLoaded from 'Helpers/Hooks/useEnsureMoviesLoaded';
 import { inputTypes, kinds } from 'Helpers/Props';
 import Movie from 'Movie/Movie';
 import { bulkDeleteMovie, setDeleteOption } from 'Store/Actions/movieActions';
@@ -32,6 +33,7 @@ const selectDeleteOptions = createSelector(
 
 function DeleteMovieModalContent(props: DeleteMovieModalContentProps) {
   const { movieIds, onModalClose } = props;
+  useEnsureMoviesLoaded();
 
   const { addImportExclusion } = useSelector(selectDeleteOptions);
   const allMovies: Movie[] = useSelector(createAllMoviesSelector());
