@@ -181,3 +181,12 @@ node_modules.nosync
 CLAUDE.md
 AGENTS.md
 docs/plans/
+
+# Agent instruction and session surfaces are intentionally local-only.
+AGENTS.md
+CLAUDE.md
+.agents/
+.claude/
+.codex/
+.agent-session
+.codex-session-*
